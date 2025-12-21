@@ -3,146 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Hamster Adventure Final Fixed</title>
+    <title>Hamster Adventure Farm Update</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
             background-color: #1e272e;
             font-family: sans-serif;
-            touch-action: none; /* ブラウザのデフォルトタッチ操作を無効化 */
+            touch-action: none;
             user-select: none;
             -webkit-user-select: none;
         }
-        #gameCanvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
+        canvas { display: block; width: 100%; height: 100%; }
+        
+        /* UI Layer */
         .ui-layer {
-            position: absolute;
-            pointer-events: none;
-            z-index: 10;
-            width: 100%;
-            height: 100%;
-            top: 0; left: 0;
+            position: absolute; pointer-events: none; z-index: 10;
+            width: 100%; height: 100%; top: 0; left: 0;
         }
         .ui-text {
-            position: absolute;
-            right: 20px;
-            font-weight: bold;
-            text-shadow: 2px 2px 0 #000;
-            text-align: right;
+            position: absolute; right: 20px; font-weight: bold;
+            text-shadow: 2px 2px 0 #000; text-align: right;
         }
         #score { top: 20px; font-size: 24px; color: #00d8d6; }
         #seedCount { top: 50px; font-size: 24px; color: #feca57; }
         #flickHint {
-            top: 85px; 
-            font-size: 16px; 
-            color: #fff; 
-            opacity: 0.8;
-            background-color: rgba(0,0,0,0.3);
-            padding: 4px 8px;
-            border-radius: 4px;
+            top: 85px; font-size: 16px; color: #fff; opacity: 0.8;
+            background-color: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px;
         }
         
+        /* Buttons & Inputs */
         .btn {
-            pointer-events: auto;
-            background-color: #fff;
-            border: 2px solid #333;
-            border-radius: 8px;
-            padding: 10px 20px;
-            font-weight: bold;
-            font-size: 16px;
-            cursor: pointer;
-            box-shadow: 0 4px 0 #999;
-            margin: 5px;
+            pointer-events: auto; background-color: #fff; border: 2px solid #333;
+            border-radius: 8px; padding: 10px 20px; font-weight: bold; font-size: 16px;
+            cursor: pointer; box-shadow: 0 4px 0 #999; margin: 5px;
         }
-        .btn:active {
-            box-shadow: 0 2px 0 #999;
-            transform: translateY(2px);
-        }
+        .btn:active { box-shadow: 0 2px 0 #999; transform: translateY(2px); }
         .btn:disabled {
-            background-color: #ccc;
-            color: #666;
-            cursor: not-allowed;
-            box-shadow: none;
-            transform: none;
+            background-color: #ccc; color: #666; cursor: not-allowed;
+            box-shadow: none; transform: none;
         }
 
+        /* Modals */
         .modal {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.85);
-            padding: 20px;
-            border-radius: 15px;
-            text-align: center;
-            color: #fff;
-            z-index: 80;
-            display: none;
-            width: 80%;
-            max-width: 320px;
-            border: 2px solid #fff;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.9); padding: 20px; border-radius: 15px;
+            text-align: center; color: #fff; z-index: 80; display: none;
+            width: 85%; max-width: 350px; border: 2px solid #fff;
         }
 
+        /* Nest UI */
         #nestUI {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 95%;
-            max-width: 500px;
-            background-color: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 15px;
-            text-align: center;
-            z-index: 50;
-            display: none;
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.3);
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 95%; max-width: 500px; background-color: rgba(255, 255, 255, 0.95);
+            padding: 15px; border-radius: 15px; text-align: center; z-index: 50;
+            display: none; box-shadow: 0 -5px 20px rgba(0,0,0,0.3);
         }
-        #nestStats {
-            font-size: 16px;
-            margin-bottom: 10px;
-            color: #2d3436;
-            line-height: 1.6;
-            text-align: left;
-            padding: 0 10px;
-        }
-        .breed-info {
-            font-size: 14px;
-            color: #d63031;
-            font-weight: bold;
-        }
+        #nestStats { font-size: 16px; margin-bottom: 10px; color: #2d3436; text-align: left; padding: 0 10px; }
+        .breed-info { font-size: 14px; color: #d63031; font-weight: bold; }
         .slider-container { margin: 10px 0; text-align: left; padding: 0 10px; }
         input[type=range] { width: 100%; }
-        
-        .action-area {
-            display: flex;
-            justify-content: space-between;
-            gap: 10px;
-        }
-        .action-area button {
-            flex: 1;
-        }
+        .action-area { display: flex; justify-content: space-between; gap: 10px; }
+        .action-area button { flex: 1; }
 
-        #instruction {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 20px;
-            color: #fff;
-            text-shadow: 2px 2px 0 #000;
-            pointer-events: none;
-            text-align: center;
-            z-index: 20;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 20px;
-            border-radius: 10px;
-            width: 80%;
+        /* Field UI */
+        #fieldUI {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #5d4037; z-index: 40; display: none;
+            overflow-y: auto; padding-top: 60px;
         }
+        #fieldHeader {
+            position: absolute; top: 0; left: 0; width: 100%; height: 50px;
+            background: rgba(0,0,0,0.5); color: #fff; line-height: 50px;
+            text-align: center; font-size: 20px; font-weight: bold; z-index: 45;
+        }
+        .field-grid {
+            display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px;
+            padding: 10px; margin-bottom: 100px;
+        }
+        .field-slot {
+            aspect-ratio: 1; background-color: #3e2723; border: 2px solid #795548;
+            border-radius: 5px; position: relative; display: flex;
+            justify-content: center; align-items: center; font-size: 24px;
+            cursor: pointer;
+        }
+        .field-slot.locked { background-color: #2b1d19; border-color: #3e2723; opacity: 0.5; }
+        .slot-info { font-size: 10px; position: absolute; bottom: 2px; color: #fff; width: 100%; text-align: center;}
+
+        /* Shop Button in Nest */
+        #shopBtnContainer { position: absolute; top: -50px; right: 10px; }
         
-        #logModal { z-index: 90; }
+        #instruction {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 20px; color: #fff; text-shadow: 2px 2px 0 #000;
+            pointer-events: none; text-align: center; z-index: 20;
+            background-color: rgba(0, 0, 0, 0.5); padding: 20px; border-radius: 10px; width: 80%;
+        }
         #loading {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: #1e272e; color: #fff; display: flex;
@@ -161,7 +117,6 @@
 </div>
 
 <canvas id="gameCanvas"></canvas>
-
 <div id="instruction" style="display:none;">タップしてスタート</div>
 
 <div id="pauseModal" class="modal">
@@ -193,16 +148,26 @@
 
 <div id="logModal" class="modal">
     <h3>📝 冒険日誌</h3>
-    <div id="logContent" style="text-align: left; margin: 10px 0; font-size: 14px;"></div>
+    <div id="logContent" style="text-align: left; margin: 10px 0; font-size: 14px; max-height:200px; overflow-y:auto;"></div>
     <button class="btn" onclick="closeLog()">閉じる</button>
 </div>
 
+<div id="shopModal" class="modal">
+    <h3>🛒 ハムショップ</h3>
+    <div id="shopContent" style="text-align:left; margin-bottom:15px;"></div>
+    <button class="btn" onclick="closeShop()">閉じる</button>
+</div>
+
 <div id="nestUI">
+    <div id="shopBtnContainer" style="display:none;">
+        <button class="btn" style="background:#54a0ff; color:#fff; font-size:14px; padding:5px 10px;" onclick="openShop()">🛒 ショップ</button>
+    </div>
     <div id="nestStats">
         <div>🌻 貯蔵種: <b id="bankSeeds" style="color:#e67e22; font-size:20px;">0</b> 個</div>
         <div>🐹 大人: <b id="bankFriends">0</b> 匹 / 👶 子ハム: <b id="babyCount">0</b> 匹</div>
         <div id="pregnantInfo" class="breed-info"></div>
     </div>
+    <div style="font-size:12px; color:#aaa; margin-bottom:5px;">👉 右スワイプで畑へ</div>
     <hr>
     <div class="slider-container">
         <label>連れて行く: <b id="takeCount">0</b> 匹</label>
@@ -211,6 +176,15 @@
     <div class="action-area">
         <button id="breedBtn" class="btn" style="background:#fd79a8; color:#fff;" onclick="startBreedingCheck()">💖 繁殖</button>
         <button class="btn" style="background:#00cec9; color:#fff;" onclick="departFromNest()">冒険へ！</button>
+    </div>
+</div>
+
+<div id="fieldUI">
+    <div id="fieldHeader">🌻 ひまわり畑 <span style="font-size:12px; font-weight:normal;">(←スワイプで巣へ)</span></div>
+    <div style="text-align:center; color:#feca57; margin-top:10px;">所持: <span id="fieldSeeds">0</span> Seeds</div>
+    <div id="fieldGrid" class="field-grid"></div>
+    <div style="text-align:center; color:#ccc; font-size:12px; padding:20px;">
+        種を植えると3回の冒険後に収穫できます。<br>(1粒 → 10粒)
     </div>
 </div>
 
@@ -227,7 +201,6 @@
         fall: { img: new Image(), loaded: false },
         seed: { img: new Image(), loaded: false }
     };
-    
     sprites.idle.img.src = 'ham.idle.png';
     sprites.run.img.src = 'ham.run.png';
     sprites.jump.img.src = 'ham.jump.png';
@@ -241,43 +214,23 @@
 
     function checkAllImagesLoaded() {
         imagesLoadedCount++;
-        if (imagesLoadedCount >= totalImages) {
-            startGame();
-        }
+        if (imagesLoadedCount >= totalImages) startGame();
     }
+    for (let key in sprites) {
+        sprites[key].img.onload = () => { sprites[key].loaded = true; checkAllImagesLoaded(); };
+        sprites[key].img.onerror = () => { console.warn("Load failed: " + sprites[key].img.src); sprites[key].loaded = false; checkAllImagesLoaded(); };
+    }
+    setTimeout(() => { if (!gameStarted) startGame(); }, 3000);
 
     function startGame() {
         if (gameStarted) return;
         gameStarted = true;
         document.getElementById('loading').style.display = 'none';
-        
-        // 初回ロード時は巣を表示
         if (localStorage.getItem('ham_seeds')) initNest(); else initNest();
     }
 
-    for (let key in sprites) {
-        sprites[key].img.onload = function() {
-            sprites[key].loaded = true;
-            checkAllImagesLoaded();
-        };
-        sprites[key].img.onerror = function() {
-            console.warn("Image load failed: " + sprites[key].img.src);
-            sprites[key].loaded = false; 
-            checkAllImagesLoaded(); 
-        };
-    }
-
-    // 3秒でタイムアウト（画像エラー時も強制開始）
-    setTimeout(() => {
-        if (!gameStarted) {
-            console.warn("Loading timeout. Force start.");
-            startGame();
-        }
-    }, 3000);
-
-
     // ==========================================
-    // ▼▼▼ 設定エリア ▼▼▼
+    // ▼▼▼ 設定 & データ管理 ▼▼▼
     // ==========================================
     const ZOOM_SCALE = 0.6; 
     const FRIEND_INTERVAL_METER = 200; 
@@ -286,48 +239,204 @@
     const SEED_CAPACITY_PER_HAMSTER = 100;
     const BREEDING_COST_SEEDS = 600;
     const BABIES_PER_BIRTH = 6;
+    const FIELD_GROWTH_TRIPS = 3; // 収穫までの冒険回数
 
-    const PILLAR_CONFIG = { minWidth: 10, maxWidth: 10, minGap: 0, maxGap: 0, baseColor: '#0be881' };
-    const SPAWN_PATTERNS = {
-        normal: { name: "基本モード", weight: 60, width: { min: 300, max: 600 }, gap: { min: 50, max: 150 } },
-        rapid: { name: "連打モード", weight: 30, width: { min: 30, max: 150 }, gap: { min: 30, max: 80 } },
-        longJump: { name: "大ジャンプモード", weight: 10, width: { min: 200, max: 400 }, gap: { min: 180, max: 500 } }
-    };
-
+    // 画面サイズ調整
     function resize() {
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-        canvas.width = screenWidth / ZOOM_SCALE;
-        canvas.height = screenHeight / ZOOM_SCALE;
+        const sw = window.innerWidth; const sh = window.innerHeight;
+        canvas.width = sw / ZOOM_SCALE; canvas.height = sh / ZOOM_SCALE;
     }
     window.addEventListener('resize', resize);
     resize();
 
-    // ==========================================
-    // ▼▼▼ 状態・データ管理 ▼▼▼
-    // ==========================================
-    let gameState = 'loading';
+    // セーブデータ
+    let gameState = 'loading'; // loading, nest, field, playing, paused, gameover
     let bankSeeds = parseInt(localStorage.getItem('ham_seeds') || '0');
     let bankFriends = parseInt(localStorage.getItem('ham_friends') || '0');
     let breedingQueue = JSON.parse(localStorage.getItem('ham_breeding') || '[]');
-    let selectedFriendsCount = 0; 
     
-    // ドラッグ操作用
-    let draggedHamster = null;
-    let dragOffsetX = 0;
-    let dragOffsetY = 0;
+    // 新機能用データ
+    let shopUnlocked = (localStorage.getItem('ham_shopUnlocked') === 'true');
+    let fieldLevel = parseInt(localStorage.getItem('ham_fieldLevel') || '0'); // 0:未開放, 1~:列数
+    let fieldData = JSON.parse(localStorage.getItem('ham_fieldData') || '[]'); 
+    // fieldData example: [{state:0, progress:0}, ...] (state: 0=empty, 1=planted)
+    
+    let selectedFriendsCount = 0; 
 
     function saveData() {
         localStorage.setItem('ham_seeds', bankSeeds);
         localStorage.setItem('ham_friends', bankFriends);
         localStorage.setItem('ham_breeding', JSON.stringify(breedingQueue));
+        localStorage.setItem('ham_shopUnlocked', shopUnlocked);
+        localStorage.setItem('ham_fieldLevel', fieldLevel);
+        localStorage.setItem('ham_fieldData', JSON.stringify(fieldData));
     }
 
     // ==========================================
-    // ▼▼▼ 繁殖・消費システム ▼▼▼
+    // ▼▼▼ 畑 (Field) システム ▼▼▼
+    // ==========================================
+    function initFieldData() {
+        // レベルに応じたスロット数を確保 (1列6個)
+        const totalSlots = fieldLevel * 6;
+        while(fieldData.length < totalSlots) {
+            fieldData.push({ state: 0, progress: 0 }); // state:0=空, 1=育成中, 2=収穫可
+        }
+    }
+
+    function openField() {
+        gameState = 'field';
+        document.getElementById('nestUI').style.display = 'none';
+        document.getElementById('fieldUI').style.display = 'block';
+        updateFieldUI();
+    }
+
+    function closeField() {
+        gameState = 'nest';
+        document.getElementById('fieldUI').style.display = 'none';
+        initNest(); // 巣に戻る
+    }
+
+    function updateFieldUI() {
+        document.getElementById('fieldSeeds').innerText = bankSeeds;
+        const grid = document.getElementById('fieldGrid');
+        grid.innerHTML = '';
+
+        if (fieldLevel === 0) {
+            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#aaa; padding:50px;">畑はまだ荒れ地です。<br>ショップで開墾しましょう。</div>';
+            return;
+        }
+
+        initFieldData();
+
+        fieldData.forEach((slot, idx) => {
+            const div = document.createElement('div');
+            div.className = 'field-slot';
+            
+            if (slot.state === 0) {
+                // 空き地
+                div.innerHTML = ''; 
+                div.onclick = () => plantSeed(idx);
+            } else if (slot.state === 1) {
+                // 育成中
+                let icon = '🌱';
+                if (slot.progress >= 1) icon = '🌿';
+                if (slot.progress >= 2) icon = '🌳'; 
+                div.innerHTML = `${icon}<div class="slot-info">あと${FIELD_GROWTH_TRIPS - slot.progress}回</div>`;
+            } else if (slot.state === 2) {
+                // 収穫可能
+                div.innerHTML = '🌻<div class="slot-info" style="color:#ff0;">収穫!</div>';
+                div.style.borderColor = '#ffd700';
+                div.onclick = () => harvest(idx);
+            }
+            grid.appendChild(div);
+        });
+    }
+
+    function plantSeed(idx) {
+        if (bankSeeds < 1) { alert("種がありません！"); return; }
+        bankSeeds -= 1;
+        fieldData[idx].state = 1;
+        fieldData[idx].progress = 0;
+        saveData();
+        updateFieldUI();
+    }
+
+    function harvest(idx) {
+        bankSeeds += 10;
+        fieldData[idx].state = 0;
+        fieldData[idx].progress = 0;
+        saveData();
+        updateFieldUI();
+        // 演出用
+        alert("種を10個収穫しました！");
+    }
+
+    function processFieldGrowth() {
+        // 冒険から帰るたびに呼び出す
+        let grew = false;
+        fieldData.forEach(slot => {
+            if (slot.state === 1) {
+                slot.progress++;
+                if (slot.progress >= FIELD_GROWTH_TRIPS) {
+                    slot.state = 2; // 収穫可能へ
+                }
+                grew = true;
+            }
+        });
+        if (grew) saveData();
+        return grew;
+    }
+
+    // ==========================================
+    // ▼▼▼ ショップ (Shop) システム ▼▼▼
+    // ==========================================
+    function openShop() {
+        const modal = document.getElementById('shopModal');
+        const content = document.getElementById('shopContent');
+        content.innerHTML = '';
+
+        // 商品1: 畑開放 (Level 0 -> 1)
+        if (fieldLevel === 0) {
+            content.innerHTML += `
+                <div style="margin-bottom:10px; border:1px solid #555; padding:10px; border-radius:5px;">
+                    <b>🚜 畑を開墾する</b><br>
+                    <span style="color:#feca57">価格: 1000 Seeds</span><br>
+                    <button class="btn" onclick="buyFieldUnlock()">購入する</button>
+                </div>
+            `;
+        } else {
+            // 商品2: 畑拡張
+            let cost = 1000 * (fieldLevel + 1); // レベルが上がるごとに高くなる
+            content.innerHTML += `
+                <div style="margin-bottom:10px; border:1px solid #555; padding:10px; border-radius:5px;">
+                    <b>🚜 畑を広げる (+1列)</b><br>
+                    <span style="color:#feca57">価格: ${cost} Seeds</span><br>
+                    <button class="btn" onclick="buyFieldExpand(${cost})">購入する</button>
+                </div>
+            `;
+        }
+        
+        modal.style.display = 'block';
+    }
+
+    function closeShop() { document.getElementById('shopModal').style.display = 'none'; }
+
+    function buyFieldUnlock() {
+        if (bankSeeds >= 1000) {
+            bankSeeds -= 1000;
+            fieldLevel = 1;
+            saveData();
+            alert("畑が使えるようになりました！\n右にスワイプして見に行こう！");
+            updateNestUI();
+            openShop(); // リロード
+        } else {
+            alert("種が足りません！");
+        }
+    }
+
+    function buyFieldExpand(cost) {
+        if (bankSeeds >= cost) {
+            bankSeeds -= cost;
+            fieldLevel++;
+            saveData();
+            alert("畑が広がりました！");
+            updateNestUI();
+            openShop();
+        } else {
+            alert("種が足りません！");
+        }
+    }
+
+    // ==========================================
+    // ▼▼▼ 繁殖・消費・時間経過 ▼▼▼
     // ==========================================
     function startBreedingCheck() {
-        if (bankSeeds >= BREEDING_COST_SEEDS && bankFriends >= 1) {
+        // ★修正: 常にボタンを押せるようにし、条件分岐でアラートを出す
+        if (bankSeeds < BREEDING_COST_SEEDS) {
+            alert(`種が足りません！\n必要: ${BREEDING_COST_SEEDS}個\n現在: ${bankSeeds}個`);
+        } else if (bankFriends < 1) {
+            alert("親になる大人のハムスターがいません！");
+        } else {
             document.getElementById('breedingModal').style.display = 'block';
         }
     }
@@ -342,11 +451,9 @@
         }
         closeBreedingModal();
     }
+    function cancelBreeding() { document.getElementById('breedingModal').style.display = 'none'; }
 
-    function cancelBreeding() { closeBreedingModal(); }
-    function closeBreedingModal() { document.getElementById('breedingModal').style.display = 'none'; }
-
-    function processTimePassage(collectedSeeds, returnedFriendsCount) {
+    function processTimePassage(collectedSeeds, returnedFriendsCount, foundShopHamster) {
         let log = [];
         bankSeeds += collectedSeeds;
         log.push(`種を ${collectedSeeds} 個持ち帰りました。`);
@@ -356,6 +463,23 @@
             log.push(`仲間 ${returnedFriendsCount} 匹が無事に帰還しました！`);
         }
 
+        // ショップ解放チェック
+        if (foundShopHamster && !shopUnlocked) {
+            shopUnlocked = true;
+            log.push(`<span style="color:#54a0ff; font-weight:bold;">🎉 ショップハムスターを助け出した！<br>ショップ機能が開放されました！</span>`);
+        } else if (foundShopHamster) {
+            bankFriends++; // すでに開放済ならただの仲間
+            log.push(`迷子のハムスターを連れ帰りました。`);
+        }
+
+        // 畑の成長
+        if (fieldLevel > 0) {
+            if (processFieldGrowth()) {
+                log.push(`🌻 <span style="color:#feca57">畑のひまわりが成長しました！</span>`);
+            }
+        }
+
+        // 繁殖・消費
         let babyCount = 0; let pregnantCount = 0;
         breedingQueue.forEach(q => { if (q.type === 'pregnant') pregnantCount += q.count; if (q.type === 'baby') babyCount += q.count; });
         let totalMouths = bankFriends + pregnantCount + babyCount;
@@ -395,13 +519,13 @@
     }
 
     // ==========================================
-    // ▼▼▼ 巣の描画・UI ▼▼▼
+    // ▼▼▼ 巣 (Nest) 描画・ロジック ▼▼▼
     // ==========================================
     let nestHamsters = []; let nestSeeds = []; 
 
     class PhysicsSeed {
         constructor(x, y) {
-            this.x = x; this.y = y; this.physRadius = 5; this.drawRadius = 12; 
+            this.x = x; this.y = y; this.physRadius = 5; 
             this.vx = (Math.random() - 0.5) * 5; this.vy = Math.random() * 5;
             this.rotation = Math.random() * Math.PI * 2; this.sleeping = false; 
         }
@@ -412,9 +536,9 @@
             this.vx *= 0.95; this.vy *= 0.95;
             let floorY = canvas.height - NEST_FLOOR_OFFSET;
             if (this.y + this.physRadius > floorY) { this.y = floorY - this.physRadius; this.vy *= -0.3; this.vx *= 0.7; }
-            if (this.x - this.physRadius < 0) { this.x = this.physRadius; this.vx *= -0.5; }
-            if (this.x + this.physRadius > canvas.width) { this.x = canvas.width - this.physRadius; this.vx *= -0.5; }
-            if (Math.abs(this.vx) < 0.05 && Math.abs(this.vy) < 0.1 && this.y > floorY - this.physRadius - 5) { this.vx = 0; this.vy = 0; this.sleeping = true; }
+            if (this.x - 5 < 0) { this.x = 5; this.vx *= -0.5; }
+            if (this.x + 5 > canvas.width) { this.x = canvas.width - 5; this.vx *= -0.5; }
+            if (Math.abs(this.vx) < 0.05 && Math.abs(this.vy) < 0.1 && this.y > floorY - 10) { this.vx = 0; this.vy = 0; this.sleeping = true; }
         }
         draw() {
             ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.rotation + this.x * 0.1); 
@@ -428,59 +552,35 @@
         constructor(stage = 0) { 
             this.stage = stage;
             this.x = Math.random() * canvas.width;
-            
-            // ★修正: Y座標をランダムに分散させて見下ろし感を出す
             let floorTop = canvas.height - NEST_FLOOR_OFFSET;
-            let depthRange = 250; // 奥行きの範囲
+            let depthRange = 250; 
             this.y = floorTop + Math.random() * depthRange; 
-            this.groundY = this.y; // 個別の地面の高さを記憶
+            this.groundY = this.y; 
 
-            if (this.stage === 2) { 
-                this.size = 40; this.state = 'newborn'; 
-            } else if (this.stage === 1) { 
-                this.size = 65; this.state = 'idle'; 
-            } else { 
-                this.size = 90; this.state = 'idle'; 
-            }
+            if (this.stage === 2) { this.size = 40; this.state = 'newborn'; } 
+            else if (this.stage === 1) { this.size = 65; this.state = 'idle'; } 
+            else { this.size = 90; this.state = 'idle'; }
 
-            this.timer = Math.random() * 60; 
-            this.vx = 0; 
-            this.vy = 0; 
-            this.flip = false; 
-            this.lastFlip = false;
-            this.hopOffset = Math.random() * Math.PI;
-            
-            this.isDragging = false;
-            this.isThrown = false; 
+            this.timer = Math.random() * 60; this.vx = 0; this.vy = 0; 
+            this.flip = false; this.hopOffset = Math.random() * Math.PI;
+            this.isDragging = false; this.isThrown = false; 
         }
 
         update() {
             if (this.isDragging) return;
 
-            // ★修正: 物理演算の着地判定を個別の groundY 基準にする
             if (this.isThrown || this.y < this.groundY) {
-                this.vy += 0.5; 
-                this.x += this.vx;
-                this.y += this.vy;
-
+                this.vy += 0.5; this.x += this.vx; this.y += this.vy;
                 if (this.y > this.groundY) {
-                    this.y = this.groundY;
-                    this.vy *= -0.5; 
-                    this.vx *= 0.8;  
-                    if (Math.abs(this.vy) < 1) {
-                        this.isThrown = false;
-                        this.vy = 0;
-                    }
+                    this.y = this.groundY; this.vy *= -0.5; this.vx *= 0.8;  
+                    if (Math.abs(this.vy) < 1) { this.isThrown = false; this.vy = 0; }
                 }
                 if (this.x < 0) { this.x = 0; this.vx *= -0.7; }
                 if (this.x > canvas.width) { this.x = canvas.width; this.vx *= -0.7; }
-                
                 if(Math.abs(this.vx) > 1) this.flip = this.vx < 0;
-
                 this.interactWithSeeds();
                 return;
             }
-
             if (this.stage === 2) return; 
 
             this.timer--;
@@ -497,32 +597,21 @@
             this.x += this.vx;
             if (this.x < 0) { this.x = 0; this.vx *= -1; }
             if (this.x > canvas.width) { this.x = canvas.width; this.vx *= -1; }
-            
-            if (this.vx !== 0) {
-                this.lastFlip = this.vx < 0; 
-            }
-            this.flip = this.lastFlip;
-
-            if (this.state === 'move') {
-                this.interactWithSeeds();
-            }
+            if (this.vx !== 0) this.flip = this.vx < 0; 
+            if (this.state === 'move') this.interactWithSeeds();
         }
 
         interactWithSeeds() {
             let speed = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
             if (speed < 1.0) return;
-
             for (let s of nestSeeds) {
                 let dx = s.x - this.x; let dy = s.y - (this.y - this.size/2);
                 let dist = Math.sqrt(dx*dx + dy*dy);
-                
                 if (dist < this.size * 0.6) { 
                     s.wakeUp(); 
                     let angle = Math.atan2(dy, dx); 
-                    let kickPower = speed * 0.3; 
-                    if (kickPower > 10) kickPower = 10;
-                    s.vx += Math.cos(angle) * kickPower; 
-                    s.vy += Math.sin(angle) * kickPower - 0.5; 
+                    let kickPower = Math.min(speed * 0.3, 10);
+                    s.vx += Math.cos(angle) * kickPower; s.vy += Math.sin(angle) * kickPower - 0.5; 
                 }
             }
         }
@@ -530,15 +619,11 @@
         draw() {
             let hopY = 0;
             if (!this.isThrown && !this.isDragging) {
-                if (this.stage === 2) {
-                    if (Math.random() < 0.02) hopY = -5; 
-                } else {
-                    hopY = (this.state === 'move') ? Math.sin(Date.now() / 20 + this.hopOffset) * 5 : 0; 
-                }
+                if (this.stage === 2) { if (Math.random() < 0.02) hopY = -5; } 
+                else { hopY = (this.state === 'move') ? Math.sin(Date.now() / 20 + this.hopOffset) * 5 : 0; }
             }
             
-            ctx.save(); 
-            ctx.translate(this.x, this.y - this.size/2 + hopY);
+            ctx.save(); ctx.translate(this.x, this.y - this.size/2 + hopY);
             if (this.isDragging) ctx.scale(1.1, 1.1);
             if (this.flip) ctx.scale(-1, 1);
             
@@ -561,12 +646,12 @@
         document.getElementById('pauseModal').style.display = 'none';
         document.getElementById('breedingModal').style.display = 'none';
         document.getElementById('instruction').style.display = 'none';
+        document.getElementById('fieldUI').style.display = 'none';
         updateNestUI();
-        nestHamsters = [];
         
+        nestHamsters = [];
         let displayAdults = Math.min(bankFriends, 30);
         for(let i=0; i<displayAdults; i++) nestHamsters.push(new NestHamster(0)); 
-        
         breedingQueue.forEach(q => {
             if(q.type === 'baby') {
                 let stage = q.tripsRemaining; 
@@ -574,7 +659,6 @@
                 for(let i=0; i<count; i++) nestHamsters.push(new NestHamster(stage));
             }
         });
-
         nestSeeds = [];
         let physicsCount = Math.min(bankSeeds, MAX_PHYSICS_SEEDS);
         for (let i = 0; i < physicsCount; i++) {
@@ -590,10 +674,12 @@
         breedingQueue.forEach(q => { if (q.type === 'pregnant') pregnantCount += q.count; if (q.type === 'baby') babyCount += q.count; });
         document.getElementById('bankFriends').innerText = bankFriends;
         document.getElementById('babyCount').innerText = babyCount;
-        let infoText = ""; if (pregnantCount > 0) infoText += `🤰 出産待ちの親: ${pregnantCount}匹 `;
+        let infoText = ""; if (pregnantCount > 0) infoText += `🤰 出産待ち: ${pregnantCount}匹 `;
         document.getElementById('pregnantInfo').innerText = infoText;
-        const breedBtn = document.getElementById('breedBtn');
-        if (bankSeeds >= BREEDING_COST_SEEDS && bankFriends >= 1) { breedBtn.disabled = false; breedBtn.style.opacity = 1; } else { breedBtn.disabled = true; breedBtn.style.opacity = 0.5; }
+        
+        // ショップボタン表示
+        document.getElementById('shopBtnContainer').style.display = shopUnlocked ? 'block' : 'none';
+
         const slider = document.getElementById('friendSlider'); slider.max = bankFriends;
         if (parseInt(slider.value) > bankFriends) slider.value = bankFriends;
         updateSlider();
@@ -602,25 +688,28 @@
     function nestLoop() {
         if (gameState !== 'nest') return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 背景
         ctx.fillStyle = '#ffeaa7'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         let floorY = canvas.height - NEST_FLOOR_OFFSET;
         ctx.fillStyle = '#fdcb6e'; ctx.fillRect(0, floorY, canvas.width, canvas.height - floorY);
         ctx.fillStyle = '#e1b12c'; ctx.fillRect(0, floorY, canvas.width, 10);
+        
         let excessSeeds = bankSeeds - nestSeeds.length;
         if (excessSeeds > 0) drawStaticSeedPile(canvas.width / 2, floorY, excessSeeds);
+        
         nestSeeds.forEach(s => s.update()); solvePhysics(); nestSeeds.forEach(s => s.draw());
         
-        // ★修正: 描画順序をY座標でソート（奥から手前へ）
         nestHamsters.sort((a, b) => a.y - b.y);
         nestHamsters.forEach(h => { h.update(); h.draw(); });
         
-        // ★修正: 自機を巨大化し、手前に配置
-        let mySize = 150; // サイズを大きく(元60)
-        let myY = floorY + 180; // 手前(下)に配置
+        // Player (Big)
+        let mySize = 150; let myY = floorY + 180; 
         ctx.save(); ctx.translate(canvas.width/2 - mySize/2, myY - mySize/2);
         if (sprites.idle.loaded) ctx.drawImage(sprites.idle.img, 0, 0, mySize, mySize);
         else { ctx.fillStyle = '#ff3f34'; ctx.fillRect(0, 0, mySize, mySize); }
         ctx.restore();
+        
         requestAnimationFrame(nestLoop);
     }
 
@@ -665,7 +754,7 @@
     }
 
     // ==========================================
-    // ▼▼▼ ゲームロジック ▼▼▼
+    // ▼▼▼ ゲームロジック (Action) ▼▼▼
     // ==========================================
     let isPlaying = false;
     let score = 0;
@@ -675,6 +764,7 @@
     let nextFriendScoreTarget = 1000;
     let spawnFriendFlag = false;
     let playerHistory = []; 
+    let hasFoundShopHamster = false; // 今回の冒険でショップハムスターを見つけたか
 
     function getMaxSeedCapacity() { return (1 + followers.length) * SEED_CAPACITY_PER_HAMSTER; }
 
@@ -711,8 +801,7 @@
         update() { this.dy += gravity; this.y += this.dy; this.x -= speed; }
         draw() {
             if (sprites.fall.loaded) {
-                ctx.save(); ctx.translate(this.x + this.width/2, this.y + this.height/2); 
-                ctx.rotate(Math.random()); 
+                ctx.save(); ctx.translate(this.x + this.width/2, this.y + this.height/2); ctx.rotate(Math.random()); 
                 ctx.drawImage(sprites.fall.img, -this.width/2, -this.height/2, this.width, this.height); ctx.restore();
             } else { ctx.fillStyle = '#ff6b6b'; ctx.fillRect(this.x, this.y, this.width, this.height); }
         }
@@ -728,22 +817,29 @@
         update() { this.x -= speed; }
     }
     let seeds = [];
+    
     class Collectible {
-        constructor(x, y) { this.x = x; this.y = y; this.width = 68; this.height = 68; }
+        constructor(x, y, isShopHamster = false) { 
+            this.x = x; this.y = y; this.width = 68; this.height = 68; 
+            this.isShopHamster = isShopHamster;
+        }
         draw() {
             ctx.globalAlpha = 1.0;
+            if (this.isShopHamster) {
+                // ショップハムスターは青色っぽいオーラ
+                ctx.save();
+                ctx.fillStyle = '#0984e3'; ctx.globalAlpha = 0.5;
+                ctx.beginPath(); ctx.arc(this.x + this.width/2, this.y + this.height/2, 40, 0, Math.PI*2); ctx.fill();
+                ctx.globalAlpha = 1.0;
+                ctx.restore();
+            }
             if (sprites.idle.loaded) ctx.drawImage(sprites.idle.img, this.x, this.y, this.width, this.height);
-            else { ctx.fillStyle = '#feca57'; ctx.fillRect(this.x, this.y, this.width, this.height); }
+            else { ctx.fillStyle = this.isShopHamster ? '#0984e3' : '#feca57'; ctx.fillRect(this.x, this.y, this.width, this.height); }
         }
         update() { this.x -= speed; }
     }
     let collectibles = []; let followers = []; let platforms = [];
-    function getRandomPattern() {
-        let totalWeight = 0; for (let key in SPAWN_PATTERNS) totalWeight += SPAWN_PATTERNS[key].weight;
-        let random = Math.random() * totalWeight; let currentWeight = 0;
-        for (let key in SPAWN_PATTERNS) { currentWeight += SPAWN_PATTERNS[key].weight; if (random < currentWeight) return SPAWN_PATTERNS[key]; }
-        return SPAWN_PATTERNS.normal;
-    }
+    
     class SlopePlatform {
         constructor(x, y, width, slopeType) {
             this.x = x; this.y = y; this.width = width; this.slopeType = slopeType;
@@ -753,8 +849,8 @@
             else { this.endY = this.y; this.slopeFactor = 0; }
             this.pillars = []; let currentX = 0;
             while (currentX < this.width) {
-                let w = PILLAR_CONFIG.minWidth + Math.random() * (PILLAR_CONFIG.maxWidth - PILLAR_CONFIG.minWidth);
-                let g = PILLAR_CONFIG.minGap + Math.random() * (PILLAR_CONFIG.maxGap - PILLAR_CONFIG.minGap);
+                let w = 10 + Math.random() * 0;
+                let g = 0;
                 if (currentX + w > this.width) w = this.width - currentX;
                 let pillarTopY = this.y + (currentX * this.slopeFactor);
                 this.pillars.push({ relX: currentX, endRelX: currentX + w, y: pillarTopY, w: w }); currentX += w + g;
@@ -765,7 +861,7 @@
             for (let p of this.pillars) { if (relX >= p.relX && relX <= p.endRelX) return p.y; } return null;
         }
         draw() {
-            ctx.fillStyle = PILLAR_CONFIG.baseColor;
+            ctx.fillStyle = '#0be881';
             for (let p of this.pillars) {
                 let drawX = this.x + p.relX; if (drawX > canvas.width || drawX + p.w < 0) continue;
                 ctx.fillRect(drawX, p.y, p.w, canvas.height - p.y);
@@ -774,16 +870,20 @@
         }
         update() { this.x -= speed; }
     }
-    function addPlatform(x, pattern) {
-        const width = pattern.width.min + Math.random() * (pattern.width.max - pattern.width.min);
+    
+    function addPlatform(x) {
+        const width = 300 + Math.random() * 300;
         let lastEndY = platforms.length > 0 ? platforms[platforms.length - 1].endY : canvas.height / 2;
         let startY = lastEndY + (Math.random() * 200 - 100); 
         if (startY < 150) startY = 150; if (startY > canvas.height - 150) startY = canvas.height - 150;
         const r = Math.random(); let type = 0;
         if (r < 0.4) type = 1; else if (r < 0.7) type = -1; else type = 0;
         if (startY < 200) type = -1; if (startY > canvas.height - 200) type = 1;
+        
         const newPlatform = new SlopePlatform(x, startY, width, type); platforms.push(newPlatform);
-        let seedInterval = 60; let currentSeedX = 30;
+        
+        // Seeds
+        let currentSeedX = 30;
         while (currentSeedX < width - 30) {
             if (Math.random() < 0.7) {
                 let isAir = Math.random() < 0.3;
@@ -791,59 +891,68 @@
                 let seedY = isAir ? groundY - 100 - (Math.random() * 50) : groundY - 25; 
                 let seedX = newPlatform.x + currentSeedX; seeds.push(new Seed(seedX, seedY));
             }
-            currentSeedX += seedInterval;
+            currentSeedX += 60;
         }
-        if (spawnFriendFlag) {
+        
+        // Items (Friends or Shop Hamster)
+        // 1000m付近かつ未開放ならショップハムスター出現
+        let currentDist = score / 10;
+        let isShopSpawn = (!shopUnlocked && !hasFoundShopHamster && currentDist > 950 && currentDist < 1050 && Math.random() < 0.5);
+        
+        if (spawnFriendFlag || isShopSpawn) {
             let centerX = width / 2; let centerY = newPlatform.y + (centerX * newPlatform.slopeFactor);
             let itemY = centerY - 45; 
             let itemX = x + centerX;
-            collectibles.push(new Collectible(itemX, itemY)); spawnFriendFlag = false;
+            collectibles.push(new Collectible(itemX, itemY, isShopSpawn)); 
+            if(!isShopSpawn) spawnFriendFlag = false; // 普通の仲間ならフラグ回収
         }
     }
+
     function gameLoop() {
         if (gameState !== 'playing') return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         player.update();
-        // ★修正：足元の位置を記録
         playerHistory.unshift({ footY: player.y + player.height, isGrounded: player.isGrounded, jumpCount: player.jumpCount }); 
         let maxHistory = (followers.length + 1) * 15; if (playerHistory.length > maxHistory + 100) playerHistory.length = maxHistory + 100;
+        
         if (score >= nextFriendScoreTarget) { spawnFriendFlag = true; nextFriendScoreTarget += (FRIEND_INTERVAL_METER * 10); }
+        
         if (platforms.length === 0 || platforms[platforms.length - 1].x < canvas.width - 50) {
-            if (platforms.length === 0) addPlatform(0, SPAWN_PATTERNS.normal);
+            if (platforms.length === 0) addPlatform(0);
             else {
-                let pattern = getRandomPattern();
-                let gap = pattern.gap.min + Math.random() * (pattern.gap.max - pattern.gap.min);
-                let lastPlatform = platforms[platforms.length - 1];
-                let spawnX = lastPlatform.x + lastPlatform.width + gap;
-                addPlatform(spawnX, pattern);
+                let gap = 50 + Math.random() * 100;
+                addPlatform(platforms[platforms.length - 1].x + platforms[platforms.length - 1].width + gap);
             }
         }
         player.isGrounded = false;
+        
+        // Platform Collision
         for (let i = 0; i < platforms.length; i++) {
             let plat = platforms[i]; plat.update(); plat.draw();
             if (player.x + player.width > plat.x && player.x < plat.x + plat.width) {
                 let footX = player.x + player.width / 2; let pillarY = plat.getPillarHeightAt(footX);
                 if (pillarY !== null) { if (player.y + player.height >= pillarY - 10 && player.y + player.height <= pillarY + 30 && player.dy >= 0) player.land(pillarY); }
             }
+            // Friends falling collision
             for (let j = 0; j < detachedFriends.length; j++) {
                 let df = detachedFriends[j];
                 if (!df.isDead && df.x + df.width > plat.x && df.x < plat.x + plat.width) {
                     let dfFootX = df.x + df.width / 2; let dfPillarY = plat.getPillarHeightAt(dfFootX);
-                    if (dfPillarY !== null) {
-                        if (df.y + df.height >= dfPillarY - 10 && df.y + df.height <= dfPillarY + 30 && df.dy >= 0) { 
-                            followers.push({}); 
-                            df.isDead = true; 
-                            updateSeedDisplay(); 
-                        }
+                    if (dfPillarY !== null && df.y + df.height >= dfPillarY - 10 && df.dy >= 0) { 
+                        followers.push({}); df.isDead = true; updateSeedDisplay(); 
                     }
                 }
             }
             if (plat.x + plat.width < 0) { platforms.splice(i, 1); i--; }
         }
+        
+        // Detached Friends
         for (let i = 0; i < detachedFriends.length; i++) {
             let df = detachedFriends[i]; df.update(); df.draw();
             if (df.y > canvas.height || df.x + df.width < 0 || df.isDead) { detachedFriends.splice(i, 1); i--; }
         }
+        
+        // Seeds
         for (let i = 0; i < seeds.length; i++) {
             let seed = seeds[i]; seed.update(); seed.draw();
             if (!seed.collected && player.x < seed.x + seed.width && player.x + player.width > seed.x && player.y < seed.y + seed.height && player.y + player.height > seed.y) {
@@ -852,22 +961,23 @@
             }
             if (seed.x + seed.width < 0 || (seed.collected && seed.x < player.x - 200)) { seeds.splice(i, 1); i--; }
         }
+        
+        // Collectibles
         for (let i = 0; i < collectibles.length; i++) {
             let item = collectibles[i]; item.update(); item.draw();
             if (player.x < item.x + item.width && player.x + player.width > item.x && player.y < item.y + item.height && player.y + player.height > item.y) {
-                followers.push({}); collectibles.splice(i, 1); i--; updateSeedDisplay();
+                followers.push({}); 
+                if(item.isShopHamster) hasFoundShopHamster = true;
+                collectibles.splice(i, 1); i--; updateSeedDisplay();
             } else if (item.x + item.width < 0) { collectibles.splice(i, 1); i--; }
         }
+        
+        // Followers
         for (let i = 0; i < followers.length; i++) {
-            // ★修正：フレーム遅延とスピードからX座標を計算
-            let delayFrame = 7 * (i + 1);
-            let size = 68;
+            let delayFrame = 7 * (i + 1); let size = 68;
             let pastState = playerHistory[delayFrame] || playerHistory[playerHistory.length-1];
-            
             if (pastState) {
-                let followX = player.x - (delayFrame * speed); // スピード×時間で位置計算
-                let drawY = pastState.footY - size;
-
+                let followX = player.x - (delayFrame * speed); let drawY = pastState.footY - size;
                 if (followX > -100) {
                     let img = sprites.run.loaded ? sprites.run.img : null;
                     if (!pastState.isGrounded) {
@@ -877,24 +987,19 @@
                     if(img) ctx.drawImage(img, followX, drawY, size, size);
                     else { ctx.fillStyle = '#ff9f43'; ctx.fillRect(followX, drawY, size, size); }
                 }
-            } else {
-                let followX = player.x - ((i + 1) * 50);
-                if(sprites.run.loaded) ctx.drawImage(sprites.run.img, followX, player.y, size, size);
-                else { ctx.fillStyle = '#ff9f43'; ctx.fillRect(followX, player.y, size, size); }
             }
         }
+        
         player.draw(); score++; document.getElementById('score').innerText = 'Distance: ' + Math.floor(score / 10) + 'm';
         requestAnimationFrame(gameLoop);
     }
     
-    // Input Handling
+    // ==========================================
+    // ▼▼▼ 入力ハンドリング (Swipe, Tap) ▼▼▼
+    // ==========================================
     let touchStartX = 0; let touchStartY = 0;
-    
-    // ドラッグの速度計算用
-    let lastDragX = 0;
-    let lastDragY = 0;
-    let dragVelocityX = 0;
-    let dragVelocityY = 0;
+    let draggedHamster = null; let dragOffsetX = 0; let dragOffsetY = 0;
+    let lastDragX = 0; let lastDragY = 0; let dragVelocityX = 0; let dragVelocityY = 0;
 
     function handleInputStart(e) {
         if (!gameStarted) return; 
@@ -902,110 +1007,89 @@
         
         let cx, cy;
         if(e.type === 'touchstart') { 
-            e.preventDefault(); 
-            touchStartX = e.touches[0].clientX; 
-            touchStartY = e.touches[0].clientY; 
+            // e.preventDefault(); // ここを有効にするとスクロール阻害の可能性あり、調整
+            touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; 
         } else { 
-            touchStartX = e.clientX; 
-            touchStartY = e.clientY; 
+            touchStartX = e.clientX; touchStartY = e.clientY; 
         }
-        
-        // 座標計算
+        cx = touchStartX; cy = touchStartY;
+
+        // Canvas内座標変換
         let rect = canvas.getBoundingClientRect();
-        let scaleX = canvas.width / rect.width;
-        let scaleY = canvas.height / rect.height;
-        cx = (touchStartX - rect.left) * scaleX;
-        cy = (touchStartY - rect.top) * scaleY;
+        let scaleX = canvas.width / rect.width; let scaleY = canvas.height / rect.height;
+        let gameX = (cx - rect.left) * scaleX; let gameY = (cy - rect.top) * scaleY;
 
         if (gameState === 'nest') {
-            // ★ハムスターの掴み判定
+            // ハムスタードラッグ判定
             for(let h of nestHamsters) {
-                let dx = h.x - cx; 
-                let dy = (h.y - h.size/2) - cy;
+                let dx = h.x - gameX; let dy = (h.y - h.size/2) - gameY;
                 let dist = Math.sqrt(dx*dx + dy*dy);
                 if (dist < h.size) {
-                    draggedHamster = h;
-                    h.isDragging = true;
-                    h.isThrown = false;
-                    h.vx = 0; h.vy = 0;
-                    dragOffsetX = h.x - cx;
-                    dragOffsetY = (h.y - h.size/2) - cy;
-                    lastDragX = cx; lastDragY = cy;
-                    return; // ハムスターを掴んだら種判定はしない
+                    draggedHamster = h; h.isDragging = true; h.isThrown = false; h.vx = 0; h.vy = 0;
+                    dragOffsetX = h.x - gameX; dragOffsetY = (h.y - h.size/2) - gameY;
+                    lastDragX = gameX; lastDragY = gameY;
+                    return; 
                 }
             }
-
-            // 種の物理インタラクション（既存）
+            // 種インタラクト
             for(let s of nestSeeds) {
-                let dx = s.x - cx; let dy = s.y - cy;
-                let dist = Math.sqrt(dx*dx + dy*dy);
+                let dx = s.x - gameX; let dy = s.y - gameY; let dist = Math.sqrt(dx*dx + dy*dy);
                 if (dist < 100) {
                     let force = (100 - dist) * 0.2; s.wakeUp();
                     s.vx += (dx/dist) * force + (Math.random()-0.5)*5; s.vy -= force * 0.5 + Math.random()*5;
                 }
             }
+        } else if (gameState === 'playing') {
+            player.jump();
         }
-        else if (gameState === 'playing') player.jump();
     }
 
-    // ★追加: ドラッグ中の移動処理
     function handleInputMove(e) {
-        if (gameState !== 'nest' || !draggedHamster) return;
-        e.preventDefault();
-
-        let cx, cy;
-        if(e.type === 'touchmove') {
-            cx = e.touches[0].clientX;
-            cy = e.touches[0].clientY;
-        } else {
-            cx = e.clientX;
-            cy = e.clientY;
+        if (gameState === 'nest' && draggedHamster) {
+            e.preventDefault();
+            let cx, cy;
+            if(e.type === 'touchmove') { cx = e.touches[0].clientX; cy = e.touches[0].clientY; } 
+            else { cx = e.clientX; cy = e.clientY; }
+            let rect = canvas.getBoundingClientRect();
+            let gameX = (cx - rect.left) * (canvas.width / rect.width);
+            let gameY = (cy - rect.top) * (canvas.height / rect.height);
+            draggedHamster.x = gameX + dragOffsetX; draggedHamster.y = gameY + dragOffsetY + draggedHamster.size/2;
+            dragVelocityX = (gameX - lastDragX) * 0.5; dragVelocityY = (gameY - lastDragY) * 0.5;
+            lastDragX = gameX; lastDragY = gameY;
         }
-
-        let rect = canvas.getBoundingClientRect();
-        let scaleX = canvas.width / rect.width;
-        let scaleY = canvas.height / rect.height;
-        let gameX = (cx - rect.left) * scaleX;
-        let gameY = (cy - rect.top) * scaleY;
-
-        // 位置更新
-        draggedHamster.x = gameX + dragOffsetX;
-        draggedHamster.y = gameY + dragOffsetY + draggedHamster.size/2; // 足元基準に戻す
-
-        // 投げる速度の計算 (簡易的な差分)
-        dragVelocityX = (gameX - lastDragX) * 0.5;
-        dragVelocityY = (gameY - lastDragY) * 0.5;
-        lastDragX = gameX;
-        lastDragY = gameY;
     }
 
     function handleInputEnd(e) {
-        // ★ドラッグ終了（投げる）
+        let touchEndX, touchEndY;
+        if(e.type === 'touchend') { touchEndX = e.changedTouches[0].clientX; touchEndY = e.changedTouches[0].clientY; }
+        else { touchEndX = e.clientX; touchEndY = e.clientY; }
+        
+        let diffX = touchEndX - touchStartX; 
+        let diffY = touchEndY - touchStartY;
+
+        // ドラッグ終了処理
         if (gameState === 'nest' && draggedHamster) {
-            draggedHamster.isDragging = false;
-            draggedHamster.isThrown = true;
-            // 速度適用（制限付き）
+            draggedHamster.isDragging = false; draggedHamster.isThrown = true;
             draggedHamster.vx = Math.max(-20, Math.min(20, dragVelocityX));
             draggedHamster.vy = Math.max(-20, Math.min(20, dragVelocityY));
             draggedHamster = null;
             return;
         }
 
-        if (gameState !== 'playing') return;
-        let touchEndX = 0; let touchEndY = 0;
-        if(e.type === 'touchend') { touchEndX = e.changedTouches[0].clientX; touchEndY = e.changedTouches[0].clientY; }
-        else { touchEndX = e.clientX; touchEndY = e.clientY; }
-        let diffX = touchEndX - touchStartX; let diffY = touchEndY - touchStartY;
-        if (diffX < -50 && Math.abs(diffX) > Math.abs(diffY)) pauseGame();
+        // スワイプ判定 (横方向)
+        if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
+            if (gameState === 'nest' && diffX > 0) { // 右スワイプ -> 畑へ
+                openField();
+            } else if (gameState === 'field' && diffX < 0) { // 左スワイプ -> 巣へ
+                closeField();
+            } else if (gameState === 'playing' && diffX < -50) { // 左スワイプ -> ポーズ
+                pauseGame();
+            }
+        }
     }
 
-    window.addEventListener('mousedown', handleInputStart);
-    window.addEventListener('mousemove', handleInputMove); // 追加
-    window.addEventListener('mouseup', handleInputEnd);
-    
-    window.addEventListener('touchstart', handleInputStart, {passive: false});
-    window.addEventListener('touchmove', handleInputMove, {passive: false}); // 追加
-    window.addEventListener('touchend', handleInputEnd);
+    window.addEventListener('mousedown', handleInputStart); window.addEventListener('mousemove', handleInputMove); window.addEventListener('mouseup', handleInputEnd);
+    window.addEventListener('touchstart', handleInputStart, {passive: false}); window.addEventListener('touchmove', handleInputMove, {passive: false}); window.addEventListener('touchend', handleInputEnd);
 
     function updateSeedDisplay() {
         let currentMax = getMaxSeedCapacity();
@@ -1016,7 +1100,7 @@
     
     function confirmGoHome() { 
         gameState = 'nest'; 
-        let log = processTimePassage(seedsCollected, followers.length);
+        let log = processTimePassage(seedsCollected, followers.length, hasFoundShopHamster);
         document.getElementById('logContent').innerHTML = log.join('<br>');
         document.getElementById('logModal').style.display = 'block';
         document.getElementById('pauseModal').style.display = 'none'; 
@@ -1026,8 +1110,7 @@
     function cancelGoHome() { gameState = 'playing'; document.getElementById('pauseModal').style.display = 'none'; gameLoop(); }
     
     function gameOver() {
-        gameState = 'gameover'; 
-        saveData();
+        gameState = 'gameover'; saveData();
         const modal = document.getElementById('gameOverModal');
         const text = document.getElementById('overlayText');
         text.innerHTML = `<h2>Game Over</h2><p>Distance: ${Math.floor(score / 10)}m</p><p>種ロスト: ${seedsCollected}</p><p style="font-size:14px; color:#aaa;">仲間とはぐれてしまった...</p>`;
@@ -1038,7 +1121,9 @@
         document.getElementById('gameOverModal').style.display = 'none'; document.getElementById('pauseModal').style.display = 'none'; document.getElementById('instruction').style.display = 'none';
         platforms = []; seeds = []; collectibles = []; followers = []; detachedFriends = []; playerHistory = [];
         player.x = 150; player.y = canvas.height / 2; player.width = 68; player.height = 68; player.dy = 0; player.jumpCount = 0; player.color = '#ff3f34';
-        // ★修正：初期履歴を正しく埋める
+        
+        hasFoundShopHamster = false; // フラグリセット
+
         for(let i=0; i<initialFollowersCount; i++){ 
             followers.push({}); 
             for(let j=0; j<15; j++) playerHistory.push({footY: player.y + player.height, isGrounded:true, jumpCount:0}); 
