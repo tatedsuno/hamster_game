@@ -7,7 +7,8 @@ const sprites = {
     jump: { img: new Image(), loaded: false },
     djump: { img: new Image(), loaded: false },
     fall: { img: new Image(), loaded: false },
-    seed: { img: new Image(), loaded: false }
+    seed: { img: new Image(), loaded: false },
+    seedMount: { img: new Image(), loaded: false }
 };
 
 sprites.idle.img.src = 'ham.idle.png';
@@ -16,6 +17,7 @@ sprites.jump.img.src = 'ham.jump.png';
 sprites.djump.img.src = 'ham.djump.png';
 sprites.fall.img.src = 'ham.fall.png';
 sprites.seed.img.src = 'seed.png';
+sprites.seedMount.img.src = 'seed_mount.png';
 
 let seedThumb = null;
 

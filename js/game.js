@@ -5,10 +5,13 @@ let isPlaying = false;
 let score = 0;
 let seedsCollected = 0;
 let gravity = 0.6;
+let baseSpeed = 7;
 let speed = 7;
+let isBoosted = false;
+let sacrificeCount = 0;
 let nextFriendScoreTarget = 1000;
 let spawnFriendFlag = false;
-let playerHistory = []; 
+let playerHistory = [];
 
 function getMaxSeedCapacity() { return (1 + followers.length) * SEED_CAPACITY_PER_HAMSTER; }
 
@@ -38,9 +41,20 @@ const player = {
             this.dy = this.jumpPower; this.isGrounded = false;
             followers.shift(); detachedFriends.push(new DetachedFriend(this.x, this.y + this.height));
             let currentMax = getMaxSeedCapacity(); if (seedsCollected > currentMax) seedsCollected = currentMax; updateSeedDisplay();
+            sacrificeCount++;
+            if (sacrificeCount >= 2) {
+                isBoosted = true;
+                speed = Math.min(speed + baseSpeed * 0.15, baseSpeed * 2.5);
+            }
         }
     },
-    land: function(y) { this.y = y - this.height; this.dy = 0; this.isGrounded = true; this.jumpCount = 0; }
+    land: function(y) {
+        this.y = y - this.height; this.dy = 0; this.isGrounded = true; this.jumpCount = 0;
+        if (isBoosted) {
+            isBoosted = false;
+        }
+        sacrificeCount = 0;
+    }
 };
 
 class DetachedFriend {
@@ -57,25 +71,61 @@ class DetachedFriend {
 let detachedFriends = [];
 
 class Seed {
-    constructor(x, y) { this.x = x; this.y = y; this.width = 22; this.height = 28; this.collected = false; }
+    constructor(x, y) { this.x = x; this.y = y; this.width = 22; this.height = 28; this.collected = false; this.magnet = false; this.value = 1; }
     draw() {
         if (this.collected) return;
         if (seedThumb) ctx.drawImage(seedThumb, this.x, this.y, this.width, this.height);
         else if (sprites.seed.loaded) ctx.drawImage(sprites.seed.img, this.x, this.y, this.width, this.height);
         else { ctx.fillStyle = '#6F4E37'; ctx.beginPath(); ctx.ellipse(this.x + this.width/2, this.y + this.height/2, this.width/2, this.height/2, 0, 0, Math.PI * 2); ctx.fill(); }
     }
-    update() { this.x -= speed; }
+    update() {
+        this.x -= speed;
+        if (this.magnet && !this.collected) {
+            if (this.mx === undefined) { this.mx = 0; this.my = 0; }
+            this.mx *= 0.85;
+            this.my *= 0.85;
+            let dx = (player.x + player.width / 2) - (this.x + this.width / 2);
+            let dy = (player.y + player.height / 2) - (this.y + this.height / 2);
+            let dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > 1) {
+                this.mx += dx / dist * 3;
+                this.my += dy / dist * 3;
+                let spd = Math.sqrt(this.mx * this.mx + this.my * this.my);
+                if (spd > 35) { this.mx *= 35 / spd; this.my *= 35 / spd; }
+                this.x += this.mx;
+                this.y += this.my;
+            }
+        }
+    }
 }
 let seeds = [];
 
 class Collectible {
-    constructor(x, y) { this.x = x; this.y = y; this.width = 68; this.height = 68; }
+    constructor(x, y) { this.x = x; this.y = y; this.width = 68; this.height = 68; this.magnet = false; }
     draw() {
         ctx.globalAlpha = 1.0;
         if (sprites.idle.loaded) ctx.drawImage(sprites.idle.img, this.x, this.y, this.width, this.height);
         else { ctx.fillStyle = '#feca57'; ctx.fillRect(this.x, this.y, this.width, this.height); }
     }
-    update() { this.x -= speed; }
+    update() {
+        this.x -= speed;
+        if (this.magnet) {
+            if (this.mx === undefined) { this.mx = 0; this.my = 0; }
+            this.mx *= 0.85;
+            this.my *= 0.85;
+            let dx = (player.x + player.width / 2) - (this.x + this.width / 2);
+            let dy = (player.y + player.height / 2) - (this.y + this.height / 2);
+            let dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > 1) {
+                this.mx += dx / dist * 3;
+                this.my += dy / dist * 3;
+                let spd = Math.sqrt(this.mx * this.mx + this.my * this.my);
+                if (spd > 35) { this.mx *= 35 / spd; this.my *= 35 / spd; }
+                this.x += this.mx;
+                this.y += this.my;
+            }
+        }
+    }
 }
 let collectibles = []; let followers = []; let platforms = [];
 
@@ -147,6 +197,16 @@ function addPlatform(x, pattern) {
 function gameLoop() {
     if (gameState !== 'playing') return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!isBoosted && speed > baseSpeed) {
+        speed += (baseSpeed - speed) * 0.05;
+        if (speed - baseSpeed < 0.1) speed = baseSpeed;
+    }
+    if (speed < baseSpeed) {
+        speed += (baseSpeed - speed) * 0.06;
+        if (baseSpeed - speed < 0.3) speed = baseSpeed;
+    }
+
     player.update();
     playerHistory.unshift({ footY: player.y + player.height, isGrounded: player.isGrounded, jumpCount: player.jumpCount }); 
     let maxHistory = (followers.length + 1) * 15; if (playerHistory.length > maxHistory + 100) playerHistory.length = maxHistory + 100;
@@ -191,7 +251,7 @@ function gameLoop() {
         let seed = seeds[i]; seed.update(); seed.draw();
         if (!seed.collected && player.x < seed.x + seed.width && player.x + player.width > seed.x && player.y < seed.y + seed.height && player.y + player.height > seed.y) {
             let currentMax = getMaxSeedCapacity();
-            if (seedsCollected < currentMax) { seed.collected = true; seedsCollected++; updateSeedDisplay(); }
+            if (seedsCollected < currentMax) { seed.collected = true; seedsCollected += (seed.value || 1); if (seedsCollected > currentMax) seedsCollected = currentMax; updateSeedDisplay(); }
         }
         if (seed.x + seed.width < 0 || (seed.collected && seed.x < player.x - 200)) { seeds.splice(i, 1); i--; }
     }
@@ -201,16 +261,15 @@ function gameLoop() {
             followers.push({}); collectibles.splice(i, 1); i--; updateSeedDisplay();
         } else if (item.x + item.width < 0) { collectibles.splice(i, 1); i--; }
     }
+
     for (let i = 0; i < followers.length; i++) {
         let delayFrame = 7 * (i + 1);
         let size = 68;
-        let pastState = playerHistory[delayFrame] || playerHistory[playerHistory.length-1];
-        
+        let pastState = playerHistory[delayFrame] || playerHistory[playerHistory.length - 1];
         if (pastState) {
             let followX = player.x - (delayFrame * speed);
             let drawY = pastState.footY - size;
             let bobY = 0;
-
             if (followX > -100) {
                 let img = sprites.run.loaded ? sprites.run.img : null;
                 if (!pastState.isGrounded) {
@@ -219,17 +278,31 @@ function gameLoop() {
                 } else {
                     bobY = Math.sin(Date.now() / 13 + (i + 1) * 1.2) * 1;
                 }
-                if(img) ctx.drawImage(img, followX, drawY + bobY, size, size);
+                if (img) ctx.drawImage(img, followX, drawY + bobY, size, size);
                 else { ctx.fillStyle = '#ff9f43'; ctx.fillRect(followX, drawY + bobY, size, size); }
             }
         } else {
             let followX = player.x - ((i + 1) * 50);
             let bobY = Math.sin(Date.now() / 13 + (i + 1) * 1.2) * 1;
-            if(sprites.run.loaded) ctx.drawImage(sprites.run.img, followX, player.y + bobY, size, size);
+            if (sprites.run.loaded) ctx.drawImage(sprites.run.img, followX, player.y + bobY, size, size);
             else { ctx.fillStyle = '#ff9f43'; ctx.fillRect(followX, player.y + bobY, size, size); }
         }
     }
-    player.draw(); score++; document.getElementById('score').innerText = 'Distance: ' + Math.floor(score / 10) + 'm';
+
+    if (speed > baseSpeed) {
+        let boostAlpha = Math.min(0.5, (speed - baseSpeed) / baseSpeed);
+        ctx.globalAlpha = boostAlpha;
+        ctx.fillStyle = '#f39c12';
+        ctx.font = 'bold 20px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('🔥 BOOST!', 15, canvas.height - 20);
+        ctx.globalAlpha = 1;
+    }
+
+    player.draw();
+    let speedRatio = Math.max(speed / baseSpeed, 1);
+    score += speedRatio * speedRatio;
+    document.getElementById('score').innerText = 'Distance: ' + Math.floor(score / 10) + 'm';
     requestAnimationFrame(gameLoop);
 }
 
@@ -264,6 +337,7 @@ function resetGame(initialFollowersCount = 0) {
     gameState = 'playing';
     document.getElementById('gameOverModal').style.display = 'none'; document.getElementById('pauseModal').style.display = 'none'; document.getElementById('instruction').style.display = 'none';
     platforms = []; seeds = []; collectibles = []; followers = []; detachedFriends = []; playerHistory = [];
+    speed = baseSpeed; isBoosted = false; sacrificeCount = 0;
     player.x = 150; player.y = canvas.height / 2; player.width = 68; player.height = 68; player.dy = 0; player.jumpCount = 0; player.color = '#ff3f34';
     for(let i=0; i<initialFollowersCount; i++){ 
         followers.push({}); 

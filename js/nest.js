@@ -4,6 +4,7 @@
 let nestHamsters = []; let nestSeeds = [];
 let nestEffects = [];
 let nestInitialFrame = true;
+let nestMainHamBottomY = 9999;
 
 class NestEffect {
     constructor(x, y, type) {
@@ -110,7 +111,7 @@ class NestHamster {
         }
 
         let floorTop = canvas.height * NEST_FLOOR_RATIO;
-        let maxY = canvas.height - this.size;
+        let maxY = Math.min(canvas.height - this.size, nestMainHamBottomY);
         let depthRange = Math.max(50, maxY - floorTop);
         this.y = floorTop + Math.random() * depthRange; 
         this.groundY = this.y;
@@ -134,7 +135,7 @@ class NestHamster {
             this.x += this.vx;
             this.y += this.vy;
 
-            let safeMaxY = cachedSafeBottomY - this.size;
+            let safeMaxY = Math.min(cachedSafeBottomY, nestMainHamBottomY);
             if (this.groundY > safeMaxY) this.groundY = safeMaxY;
 
             if (this.y > this.groundY) {
@@ -259,7 +260,13 @@ function initNest() {
     nestHamsters = [];
     nestEffects = [];
     nestInitialFrame = true;
-    
+
+    let initFloorY = canvas.height * NEST_FLOOR_RATIO;
+    let initMyY = initFloorY + 100;
+    let initSafeBottom = canvas.height;
+    if (initMyY + 100 > initSafeBottom) initMyY = initSafeBottom - 110;
+    nestMainHamBottomY = initMyY + 100;
+
     let displayAdults = Math.min(bankFriends, 30);
     for(let i=0; i<displayAdults; i++) nestHamsters.push(new NestHamster(0)); 
     
@@ -288,7 +295,7 @@ function initNest() {
 }
 
 function spawnEffect(x, y, type) {
-    nestEffects.push(new NestEffect(x, y, type));
+    if (type === 'pregnant') nestEffects.push(new NestEffect(x, y, type));
 }
 
 function applyBreedingChanges(result, suppressEffects) {
@@ -364,7 +371,6 @@ function nestLoop() {
         if (h.stage === 2 && h.breedingStartedAt > 0) {
             let progress = (now - h.breedingStartedAt) / BREEDING_CONFIG.babyGrowthTime;
             if (progress >= 0.5) {
-                if (!suppressEffects) spawnEffect(h.x, h.y - h.size / 2, 'grow');
                 h.stage = 1;
                 h.size = 65;
                 h.state = 'idle';
@@ -379,6 +385,11 @@ function nestLoop() {
     ctx.fillStyle = '#fdcb6e'; ctx.fillRect(0, floorY, canvas.width, canvas.height - floorY);
     ctx.fillStyle = '#e1b12c'; ctx.fillRect(0, floorY, canvas.width, 10);
 
+    let mySize = 200;
+    let myY = floorY + 100;
+    if (myY + mySize / 2 > cachedSafeBottomY) myY = cachedSafeBottomY - mySize / 2 - 10;
+    nestMainHamBottomY = myY + mySize / 2;
+
     let excessSeeds = bankSeeds - nestSeeds.length;
     if (excessSeeds > 0) drawStaticSeedPile(canvas.width / 2, floorY, excessSeeds);
     nestSeeds.forEach(s => s.update()); solvePhysics(); nestSeeds.forEach(s => s.draw());
@@ -389,9 +400,6 @@ function nestLoop() {
     nestEffects = nestEffects.filter(e => e.update());
     nestEffects.forEach(e => e.draw());
 
-    let mySize = 200;
-    let myY = floorY + 100;
-    if (myY + mySize / 2 > cachedSafeBottomY) myY = cachedSafeBottomY - mySize / 2 - 10;
     ctx.save(); ctx.translate(canvas.width/2 - mySize/2, myY - mySize/2);
     if (sprites.idle.loaded) ctx.drawImage(sprites.idle.img, 0, 0, mySize, mySize);
     else { ctx.fillStyle = '#ff3f34'; ctx.fillRect(0, 0, mySize, mySize); }
@@ -406,10 +414,50 @@ function nestLoop() {
 }
 
 function drawStaticSeedPile(x, y, count) {
-    let scale = Math.min(count / 1000, 3) + 0.5;
-    let width = 200 * scale; let height = 80 * scale;
-    ctx.fillStyle = '#d4ac0d'; ctx.beginPath(); ctx.ellipse(x, y + 20, width, height, 0, Math.PI, 0); ctx.fill();
-    ctx.fillStyle = '#9a7d0a'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(`+ ${count} Seeds`, x, y - height/2);
+    let totalImages = Math.max(1, Math.ceil(count / 1000));
+    let baseW = 240;
+    let baseH = 120;
+    if (sprites.seedMount.loaded) {
+        let ratio = sprites.seedMount.img.naturalHeight / sprites.seedMount.img.naturalWidth;
+        baseH = baseW * ratio;
+    }
+
+    let n = 1;
+    while (n * (n + 1) / 2 < totalImages) n++;
+    let layers = [];
+    for (let i = 0; i < n; i++) layers.push(n - i);
+    let excess = n * (n + 1) / 2 - totalImages;
+    for (let i = layers.length - 1; i >= 0 && excess > 0; i--) {
+        let remove = Math.min(layers[i], excess);
+        layers[i] -= remove;
+        excess -= remove;
+    }
+    layers = layers.filter(l => l > 0);
+
+    let spacingX = baseW * 0.75;
+    let spacingY = baseH * 0.1;
+
+    for (let li = 0; li < layers.length; li++) {
+        let num = layers[li];
+        let rowW = (num - 1) * spacingX + baseW;
+        let sx = x - rowW / 2;
+        let sy = y - baseH + 15 - li * spacingY;
+        for (let j = 0; j < num; j++) {
+            let ix = sx + j * spacingX;
+            if (sprites.seedMount.loaded) {
+                ctx.drawImage(sprites.seedMount.img, ix, sy, baseW, baseH);
+            } else {
+                ctx.fillStyle = '#d4ac0d';
+                ctx.beginPath();
+                ctx.ellipse(ix + baseW / 2, sy + baseH * 0.7, baseW / 2, baseH / 2, 0, Math.PI, 0);
+                ctx.fill();
+            }
+        }
+    }
+
+    let topY = y + 15 - baseH - (layers.length - 1) * spacingY;
+    ctx.fillStyle = '#9a7d0a'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(`+ ${count} Seeds`, x, topY - 5);
 }
 
 function solvePhysics() {
