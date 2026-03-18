@@ -311,11 +311,25 @@ function updateSeedDisplay() {
     document.getElementById('seedCount').innerText = `Seeds: ${seedsCollected} / ${currentMax}`;
 }
 
+function appendCollectionUnlockLog(log, distanceMeters) {
+    let result = updateHamsterCollectionByDistance(distanceMeters);
+    if (result.bestDistanceMeters > result.previousBest) {
+        log.push(`🏁 最長到達距離を更新: ${result.bestDistanceMeters}m`);
+    }
+    if (result.newlyUnlocked.length > 0) {
+        result.newlyUnlocked.forEach(name => {
+            log.push(`📘 新しいハムスターを発見: ${name}`);
+        });
+    }
+    return result;
+}
+
 function pauseGame() { if (gameState !== 'playing') return; gameState = 'paused'; document.getElementById('pauseModal').style.display = 'block'; }
 
 function confirmGoHome() { 
     gameState = 'nest'; 
     let log = processTimePassage(seedsCollected, followers.length);
+    appendCollectionUnlockLog(log, Math.floor(score / 10));
     document.getElementById('logContent').innerHTML = log.join('<br>');
     document.getElementById('logModal').style.display = 'block';
     document.getElementById('pauseModal').style.display = 'none'; 
@@ -326,15 +340,24 @@ function cancelGoHome() { gameState = 'playing'; document.getElementById('pauseM
 
 function gameOver() {
     gameState = 'gameover'; 
+    let gameOverLog = [];
+    appendCollectionUnlockLog(gameOverLog, Math.floor(score / 10));
     saveData();
     const modal = document.getElementById('gameOverModal');
     const text = document.getElementById('overlayText');
-    text.innerHTML = `<h2>Game Over</h2><p>Distance: ${Math.floor(score / 10)}m</p><p>種ロスト: ${seedsCollected}</p><p style="font-size:14px; color:#aaa;">仲間とはぐれてしまった...</p>`;
+    let unlockText = gameOverLog.length > 0
+        ? `<p style="font-size:14px; color:#ffeaa7;">${gameOverLog.join('<br>')}</p>`
+        : '';
+    text.innerHTML = `<h2>Game Over</h2><p>Distance: ${Math.floor(score / 10)}m</p><p>種ロスト: ${seedsCollected}</p>${unlockText}<p style="font-size:14px; color:#aaa;">仲間とはぐれてしまった...</p>`;
     modal.style.display = 'block';
 }
 
 function resetGame(initialFollowersCount = 0) {
     gameState = 'playing';
+    document.body.classList.remove('hub-mode');
+    document.body.classList.add('play-mode');
+    document.getElementById('nestHeader').style.display = 'none';
+    document.getElementById('farmHeader').style.display = 'none';
     document.getElementById('gameOverModal').style.display = 'none'; document.getElementById('pauseModal').style.display = 'none'; document.getElementById('instruction').style.display = 'none';
     platforms = []; seeds = []; collectibles = []; followers = []; detachedFriends = []; playerHistory = [];
     speed = baseSpeed; isBoosted = false; sacrificeCount = 0;

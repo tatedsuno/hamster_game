@@ -368,6 +368,10 @@ function drawFarmPlot(cx, cy, cellSize, plot) {
 
 function initFarm() {
     gameState = 'farm';
+    document.body.classList.add('hub-mode');
+    document.body.classList.remove('play-mode');
+    document.getElementById('nestHeader').style.display = 'none';
+    document.getElementById('farmHeader').style.display = 'block';
     document.getElementById('farmUI').style.display = 'block';
     document.getElementById('nestUI').style.display = 'none';
     document.getElementById('gameUI').style.display = 'none';
@@ -520,16 +524,36 @@ function farmLoop() {
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.font = '16px sans-serif';
     ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-    ctx.fillText('→ スワイプで巣へ', canvas.width - 15, 20);
+    let guideY = 20;
+    ctx.fillText('↔ スワイプで画面切替', canvas.width - 15, guideY);
 
     if (farmMaxScrollY > 0) {
-        let barH = Math.max(30, (safeBottom - 80) * (safeBottom / contentBottom));
-        let barTop = 80 + (farmScrollY / farmMaxScrollY) * (safeBottom - 80 - barH);
+        let barMinTop = 80;
+        let barH = Math.max(30, (safeBottom - barMinTop) * (safeBottom / contentBottom));
+        let barTop = barMinTop + (farmScrollY / farmMaxScrollY) * (safeBottom - barMinTop - barH);
         ctx.fillStyle = 'rgba(0,0,0,0.15)';
         ctx.fillRect(canvas.width - 20, barTop, 10, barH);
     }
 
+    updateScenePreviewBuffer('farm');
+
     requestAnimationFrame(farmLoop);
+}
+
+function isPointInsideFarmPlot(cx, cy) {
+    let layout = getFarmGridLayout();
+    for (let r = 0; r < layout.rows; r++) {
+        for (let c = 0; c < layout.cols; c++) {
+            let idx = r * layout.cols + c;
+            if (idx >= farmPlots.length) continue;
+            let px = layout.offsetX + c * (layout.cellSize + layout.gap);
+            let py = layout.offsetY + r * (layout.cellSize + layout.gap);
+            if (cx >= px && cx <= px + layout.cellSize && cy >= py && cy <= py + layout.cellSize) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 function handleFarmTap(cx, cy) {

@@ -244,6 +244,10 @@ class NestHamster {
 
 function initNest() {
     gameState = 'nest';
+    document.body.classList.add('hub-mode');
+    document.body.classList.remove('play-mode');
+    document.getElementById('nestHeader').style.display = 'block';
+    document.getElementById('farmHeader').style.display = 'none';
     document.getElementById('nestUI').style.display = 'block';
     document.getElementById('farmUI').style.display = 'none';
     document.getElementById('gameUI').style.display = 'none';
@@ -347,8 +351,11 @@ function updateNestUI() {
     let babyCount = 0; let pregnantCount = 0;
     breedingQueue.forEach(q => { if (q.type === 'pregnant') pregnantCount += q.count; if (q.type === 'baby') babyCount += q.count; });
     document.getElementById('bankFriends').innerText = bankFriends;
+    let mainHamText = document.getElementById('mainHamsterName');
+    if (mainHamText) mainHamText.innerText = mainHamsterName;
     document.getElementById('babyCount').innerText = babyCount;
     document.getElementById('pregnantCount').innerText = pregnantCount;
+    renderHamsterEncyclopedia();
     const slider = document.getElementById('friendSlider'); slider.max = bankFriends;
     if (parseInt(slider.value) > bankFriends) slider.value = bankFriends;
     updateSlider();
@@ -408,7 +415,9 @@ function nestLoop() {
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.font = '16px sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText('← 畑へスワイプ', 15, 20);
+    ctx.fillText('↔ スワイプで画面切替', 15, 20);
+
+    updateScenePreviewBuffer('nest');
 
     requestAnimationFrame(nestLoop);
 }
@@ -495,6 +504,8 @@ function updateSlider() {
 
 function departFromNest() {
     bankFriends -= selectedFriendsCount; saveData();
+    document.getElementById('nestHeader').style.display = 'none';
+    document.getElementById('farmHeader').style.display = 'none';
     document.getElementById('nestUI').style.display = 'none'; document.getElementById('gameUI').style.display = 'block';
     document.getElementById('pageIndicator').style.display = 'none';
     resize();

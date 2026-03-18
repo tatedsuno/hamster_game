@@ -18,6 +18,22 @@ function getSafeBottomY() {
 let gameState = 'loading';
 let bankSeeds = parseInt(localStorage.getItem('ham_seeds') || '0');
 let bankFriends = parseInt(localStorage.getItem('ham_friends') || '0');
+const HAMSTER_COLLECTION = [
+    'ブルーサファイアジャンガリアンハムスター',
+    'ゴールデンハムスター',
+    'キンクマ',
+    'ジャガリアンハムスター',
+    'パールホワイトジャンガリアンハムスター',
+    'プディングジャンガリアンハムスター',
+    'ロボロフスキーハムスター',
+    'キャンベルハムスター',
+    'チャイニーズハムスター',
+    'ヨーロッパハムスター'
+];
+const MAIN_HAMSTER_DEFAULT = 'ブルーサファイアジャンガリアンハムスター';
+const HAMSTER_UNLOCK_DISTANCE_STEP = 1000;
+let mainHamsterName = localStorage.getItem('ham_main_species') || MAIN_HAMSTER_DEFAULT;
+let bestDistanceMeters = parseInt(localStorage.getItem('ham_best_distance') || '0');
 let breedingQueue = JSON.parse(localStorage.getItem('ham_breeding') || '[]');
 breedingQueue.forEach(q => {
     if (q.tripsRemaining !== undefined && q.startedAt === undefined) {
@@ -51,6 +67,51 @@ let pendingDragIsNest = false;
 
 let farmScrollVelocity = 0;
 
+let scenePreviewBuffers = {
+    nest: document.createElement('canvas'),
+    farm: document.createElement('canvas')
+};
+let scenePreviewReady = {
+    nest: false,
+    farm: false
+};
+let scenePreviewLastCaptureAt = {
+    nest: 0,
+    farm: 0
+};
+
+function updateScenePreviewBuffer(scene) {
+    let buffer = scenePreviewBuffers[scene];
+    if (!buffer || !canvas) return;
+    let now = Date.now();
+    if (now - scenePreviewLastCaptureAt[scene] < 120) return;
+    scenePreviewLastCaptureAt[scene] = now;
+    if (buffer.width !== canvas.width || buffer.height !== canvas.height) {
+        buffer.width = canvas.width;
+        buffer.height = canvas.height;
+    }
+    let bctx = buffer.getContext('2d');
+    if (!bctx) return;
+    bctx.clearRect(0, 0, buffer.width, buffer.height);
+    bctx.drawImage(canvas, 0, 0);
+    scenePreviewReady[scene] = true;
+}
+
+function getScenePreviewBuffer(scene) {
+    return scenePreviewBuffers[scene] || null;
+}
+
+function hasScenePreviewBuffer(scene) {
+    return !!scenePreviewReady[scene];
+}
+
+if (!HAMSTER_COLLECTION.includes(mainHamsterName)) {
+    mainHamsterName = MAIN_HAMSTER_DEFAULT;
+}
+if (!Number.isFinite(bestDistanceMeters) || bestDistanceMeters < 0) {
+    bestDistanceMeters = 0;
+}
+
 function cancelPendingDrag() {
     pendingDragHamster = null;
 }
@@ -63,6 +124,67 @@ function saveData() {
     localStorage.setItem('ham_farm_workers', farmWorkers);
     localStorage.setItem('ham_farm_rows', farmRows);
     localStorage.setItem('ham_last_worker_action', lastWorkerAction);
+    localStorage.setItem('ham_main_species', mainHamsterName);
+    localStorage.setItem('ham_best_distance', bestDistanceMeters);
+}
+
+function getUnlockedHamsterCount(distanceMeters) {
+    let unlocked = 1 + Math.floor(distanceMeters / HAMSTER_UNLOCK_DISTANCE_STEP);
+    return Math.max(1, Math.min(HAMSTER_COLLECTION.length, unlocked));
+}
+
+function getUnlockedHamsters() {
+    return HAMSTER_COLLECTION.slice(0, getUnlockedHamsterCount(bestDistanceMeters));
+}
+
+function updateHamsterCollectionByDistance(distanceMeters) {
+    let distance = Math.max(0, Math.floor(distanceMeters || 0));
+    let previousBest = bestDistanceMeters;
+    let previousUnlockedCount = getUnlockedHamsterCount(previousBest);
+    if (distance > bestDistanceMeters) {
+        bestDistanceMeters = distance;
+    }
+    let unlockedCount = getUnlockedHamsterCount(bestDistanceMeters);
+    let newlyUnlocked = HAMSTER_COLLECTION.slice(previousUnlockedCount, unlockedCount);
+    saveData();
+    return {
+        distance,
+        previousBest,
+        bestDistanceMeters,
+        newlyUnlocked,
+        unlockedCount
+    };
+}
+
+function renderHamsterEncyclopedia() {
+    let unlockedCount = getUnlockedHamsterCount(bestDistanceMeters);
+    let content = document.getElementById('hamsterEncyclopediaContent');
+    let progress = document.getElementById('encyclopediaProgress');
+    let progressInline = document.getElementById('encyclopediaProgressInline');
+    let best = document.getElementById('encyclopediaBestDistance');
+    if (progress) progress.innerText = `${unlockedCount} / ${HAMSTER_COLLECTION.length}`;
+    if (progressInline) progressInline.innerText = `${unlockedCount} / ${HAMSTER_COLLECTION.length}`;
+    if (best) best.innerText = `${bestDistanceMeters}m`;
+    if (!content) return;
+    let html = '';
+    for (let i = 0; i < HAMSTER_COLLECTION.length; i++) {
+        let unlocked = i < unlockedCount;
+        let name = unlocked ? HAMSTER_COLLECTION[i] : '？？？？？';
+        let icon = unlocked ? '🐹' : '🔒';
+        html += `<div class="encyclopedia-row ${unlocked ? 'unlocked' : 'locked'}">${icon} ${name}</div>`;
+    }
+    content.innerHTML = html;
+}
+
+function showHamsterEncyclopedia() {
+    renderHamsterEncyclopedia();
+    let modal = document.getElementById('hamsterEncyclopediaModal');
+    if (modal) modal.style.display = 'block';
+}
+
+function closeHamsterEncyclopedia() {
+    let modal = document.getElementById('hamsterEncyclopediaModal');
+    if (modal) modal.style.display = 'none';
 }
 
 // ==========================================

@@ -8,6 +8,32 @@
 </head>
 <body>
 
+<div id="nestHeader" class="scene-header">
+    <div class="scene-header-title">🏠 巣のホーム</div>
+    <div class="scene-header-row">
+        <div class="scene-info-chip">🌻 たね <b id="bankSeeds">0</b></div>
+        <div class="scene-info-chip">🐹 おとな <b id="bankFriends">0</b></div>
+        <div class="scene-info-chip">
+            <span id="breedingInfoBtn" onclick="showBreedingInfo()" style="cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px;">
+                👶 <b id="babyCount">0</b> / 🤰 <b id="pregnantCount">0</b>
+            </span>
+        </div>
+    </div>
+    <div class="scene-header-row scene-header-row-secondary">
+        <div class="scene-info-chip scene-info-wide">⭐ <b id="mainHamsterName">ブルーサファイアジャンガリアンハムスター</b></div>
+        <div class="scene-info-chip">📘 <span id="encyclopediaProgressInline">1 / 10</span> <span id="openEncyclopediaBtn" onclick="showHamsterEncyclopedia()">開く</span></div>
+    </div>
+</div>
+
+<div id="farmHeader" class="scene-header">
+    <div class="scene-header-title">🌻 ひまわり畑</div>
+    <div class="scene-header-row">
+        <div class="scene-info-chip">🌻 たね <b id="farmBankSeeds">0</b></div>
+        <div class="scene-info-chip">🐹 ワーカー <b id="farmWorkerCount">0</b> / <span id="farmWorkerMax">0</span></div>
+        <div class="scene-info-chip">💡 タップで植える・水やり・収穫</div>
+    </div>
+</div>
+
 <div id="canvasContainer">
 <div id="loading">Loading...</div>
 
@@ -17,6 +43,10 @@
     <div id="flickHint" class="ui-text">← フリックで帰巣</div>
 </div>
 
+<div id="swipePreview">
+    <canvas id="swipePreviewCanvas"></canvas>
+    <div id="swipePreviewLabel"></div>
+</div>
 <canvas id="gameCanvas"></canvas>
 
 <div id="instruction" style="display:none;">タップしてスタート</div>
@@ -56,6 +86,16 @@
         <button class="btn" onclick="closeBreedingInfo()">閉じる</button>
     </div>
 
+    <div id="hamsterEncyclopediaModal" class="modal">
+        <h3>📘 ハムスター図鑑</h3>
+        <div style="font-size:14px; margin-bottom:8px;">
+            解放: <b id="encyclopediaProgress">1 / 10</b><br>
+            最長距離: <b id="encyclopediaBestDistance">0m</b>
+        </div>
+        <div id="hamsterEncyclopediaContent" class="encyclopedia-list"></div>
+        <button class="btn" onclick="closeHamsterEncyclopedia()">閉じる</button>
+    </div>
+
     <div id="pageIndicator">
         <div class="page-dot active" id="dotNest"></div>
         <div class="page-dot" id="dotFarm"></div>
@@ -63,34 +103,38 @@
 </div>
 
 <div id="nestUI">
-    <div id="nestStats">
-        <div>🌻 貯蔵種: <b id="bankSeeds" style="color:#e67e22; font-size:20px;">0</b> 個</div>
-        <div>🐹 大人: <b id="bankFriends">0</b> 匹 / <span id="breedingInfoBtn" onclick="showBreedingInfo()" style="cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px;">👶 <b id="babyCount">0</b> 匹 / 🤰 <b id="pregnantCount">0</b> 匹</span></div>
-    </div>
-    <hr>
-    <div class="slider-container">
-        <label>連れて行く: <b id="takeCount">0</b> 匹</label>
-        <input type="range" id="friendSlider" min="0" max="0" value="0" oninput="updateSlider()">
-    </div>
-    <div class="action-area">
-        <button class="btn" style="background:#fd79a8; color:#fff;" onclick="startBreedingCheck()">💖 繁殖</button>
-        <button class="btn" style="background:#00cec9; color:#fff;" onclick="departFromNest()">冒険へ！</button>
+    <div class="control-panel-inner">
+        <div class="panel-header panel-help">
+            <div class="panel-subtitle">仲間の人数を決めて冒険へ</div>
+        </div>
+
+        <div class="slider-container">
+            <label>連れて行く仲間: <b id="takeCount">0</b> 匹</label>
+            <input type="range" id="friendSlider" min="0" max="0" value="0" oninput="updateSlider()">
+        </div>
+
+        <div class="action-area panel-actions">
+            <button class="btn" style="background:#fd79a8; color:#fff;" onclick="startBreedingCheck()">💖 家族を増やす</button>
+            <button class="btn" style="background:#00cec9; color:#fff;" onclick="departFromNest()">🚀 冒険スタート</button>
+        </div>
     </div>
 </div>
 
 <div id="farmUI">
-    <div id="farmStats">
-        <div>🌻 貯蔵種: <b id="farmBankSeeds" style="color:#e67e22; font-size:20px;">0</b> 個</div>
-        <div>🐹 畑ワーカー: <b id="farmWorkerCount">0</b> / <span id="farmWorkerMax">0</span> 匹</div>
-    </div>
-    <hr>
-    <div class="slider-container">
-        <label>ワーカー割り当て: <b id="workerTakeCount">0</b> 匹</label>
-        <input type="range" id="workerSlider" min="0" max="0" value="0" oninput="updateWorkerSlider()">
-    </div>
-    <div class="action-area">
-        <button class="btn" style="background:#f39c12; color:#fff;" onclick="harvestAll()">🌻 一括収穫</button>
-        <button id="expandBtn" class="btn" style="background:#27ae60; color:#fff;" onclick="expandFarm()">🔨 拡張</button>
+    <div class="control-panel-inner">
+        <div class="panel-header panel-help">
+            <div class="panel-subtitle">ワーカーを割り当ててお世話を自動化</div>
+        </div>
+
+        <div class="slider-container">
+            <label>ワーカー割り当て: <b id="workerTakeCount">0</b> 匹</label>
+            <input type="range" id="workerSlider" min="0" max="0" value="0" oninput="updateWorkerSlider()">
+        </div>
+
+        <div class="action-area panel-actions">
+            <button class="btn" style="background:#f39c12; color:#fff;" onclick="harvestAll()">🌻 まとめて収穫</button>
+            <button id="expandBtn" class="btn" style="background:#27ae60; color:#fff;" onclick="expandFarm()">🔨 畑をひろげる</button>
+        </div>
     </div>
 </div>
 
