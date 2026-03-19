@@ -277,31 +277,6 @@ function processTimePassage(collectedSeeds, returnedFriendsCount) {
     let log = [];
     bankSeeds += collectedSeeds;
     log.push(`種を ${collectedSeeds} 個持ち帰りました。`);
-    
-    if (returnedFriendsCount > 0) {
-        bankFriends += returnedFriendsCount;
-        log.push(`仲間 ${returnedFriendsCount} 匹が無事に帰還しました！`);
-    }
-
-    let babyCount = 0; let pregnantCount = 0;
-    breedingQueue.forEach(q => { if (q.type === 'pregnant') pregnantCount += q.count; if (q.type === 'baby') babyCount += q.count; });
-    let totalMouths = bankFriends + farmWorkers + pregnantCount + babyCount;
-    let workerExtraCost = farmWorkers * FARM_CONFIG.workerCostPerTrip;
-    let consumption = totalMouths * 1 + workerExtraCost; 
-    log.push(`全 ${totalMouths} 匹が種を ${consumption} 個食べました。`);
-    if (farmWorkers > 0) log.push(`(畑ワーカー ${farmWorkers} 匹の追加コスト: ${workerExtraCost})`);
-
-    if (bankSeeds >= consumption) { bankSeeds -= consumption; } else {
-        let survivors = bankSeeds; let casualties = totalMouths - survivors;
-        bankSeeds = 0; 
-        log.push(`<span style="color:red">種が足りない！ ${casualties} 匹が餓死しました...</span>`);
-        for (let i = breedingQueue.length - 1; i >= 0; i--) {
-            if (casualties <= 0) break; let group = breedingQueue[i];
-            if (group.count <= casualties) { casualties -= group.count; breedingQueue.splice(i, 1); }
-            else { group.count -= casualties; casualties = 0; }
-        }
-        if (casualties > 0) { bankFriends = Math.max(0, bankFriends - casualties); }
-    }
 
     let breeding = updateBreeding();
     if (breeding.newBabiesTotal > 0) log.push(`👶 <span style="color:#fd79a8">赤ちゃんが ${breeding.newBabiesTotal} 匹生まれました！</span>`);

@@ -503,7 +503,7 @@ function updateSlider() {
 }
 
 function departFromNest() {
-    bankFriends -= selectedFriendsCount; saveData();
+    saveData();
     document.getElementById('nestHeader').style.display = 'none';
     document.getElementById('farmHeader').style.display = 'none';
     document.getElementById('nestUI').style.display = 'none'; document.getElementById('gameUI').style.display = 'block';
