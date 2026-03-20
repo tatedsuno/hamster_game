@@ -20,6 +20,7 @@ let wallEffects = [];
 let cameraX = 0;
 let cameraLeadPx = 180;
 let worldFloorY = 0;
+let pendingGameOverNestLog = null;
 const FOLLOWER_DELAY_BASE = 9;
 const FOLLOWER_SPACING_SCALE = 0.75;
 const SLOPE_STICK_SNAP = 16;
@@ -112,9 +113,12 @@ const player = {
     },
     jump: function() {
         if (this.isGrounded || this.jumpCount < this.maxJumps) {
+            // ジャンプ入力時は、壁反発による後退中でも通常前進速度へ復帰する。
+            this.vx = speed;
             this.dy = this.jumpPower; this.jumpCount++; this.isGrounded = false;
             if (this.jumpCount === 2) this.dy = this.jumpPower * 0.9;
         } else if (followers.length > 0) {
+            this.vx = speed;
             this.dy = this.jumpPower; this.isGrounded = false;
             followers.shift(); detachedFriends.push(new DetachedFriend(this.x, this.y + this.height));
             let currentMax = getMaxSeedCapacity(); if (seedsCollected > currentMax) seedsCollected = currentMax; updateSeedDisplay();
@@ -467,9 +471,7 @@ function prepareWallSpawnX() {
 
 function isHamsterOverlappingWall(hamsterX, hamsterY, size, wall) {
     return hamsterX < wall.x + wall.width &&
-           hamsterX + size > wall.x &&
-           hamsterY < wall.y + wall.height &&
-           hamsterY + size > wall.y;
+           hamsterX + size > wall.x;
 }
 
 function getBodyCollider(body, width, height) {
@@ -482,11 +484,15 @@ function getBodyCollider(body, width, height) {
 }
 
 function getWallCollider(wall) {
+    // 描画は画面内の高さのまま、衝突判定だけ上方向へ十分拡張して
+    // ジャンプで壁上を越えられないようにする。
+    const collisionTop = -200000;
+    const collisionBottom = canvas.height + 200000;
     return {
         x: wall.x,
-        y: wall.y,
+        y: collisionTop,
         width: wall.width,
-        height: wall.height
+        height: collisionBottom - collisionTop
     };
 }
 
@@ -520,12 +526,7 @@ function resolveBodyWallCollision(body, bodyWidth, bodyHeight, wall) {
         if (overlapLeft <= overlapRight) body.x -= overlapLeft + 0.1;
         else body.x += overlapRight + 0.1;
         let bounceSpeed = Math.max(0, impactVx);
-        let bounceRad = (WALL_CONFIG.ramBounceAngleDeg || 30) * Math.PI / 180;
-        let bounceVx = -Math.cos(bounceRad) * bounceSpeed;
-        let bounceVy = -Math.sin(bounceRad) * bounceSpeed;
-        body.vx = bounceVx;
-        if (body.dy !== undefined) body.dy = bounceVy;
-        if (body.vy !== undefined) body.vy = bounceVy;
+        body.vx = -bounceSpeed;
         body.isGrounded = false;
         return { normal: 'x', impactSpeed: Math.max(0, impactVx) };
     }
@@ -647,7 +648,7 @@ function addWallEffect(x, y, burst = false) {
     wallEffects.push(new BiteParticle(x, y, burst));
 }
 
-function tryApplyRamDamage(wall, body, bodyType, impactSpeed) {
+function tryApplyRamDamage(wall, body, bodyType, impactSpeed, damageScale = 1) {
     if (!wall || wall.destroyed) return;
     if (!body) return;
     if ((body.wallRamCooldown || 0) > 0) return;
@@ -655,15 +656,16 @@ function tryApplyRamDamage(wall, body, bodyType, impactSpeed) {
     body.wallRamCooldown = WALL_CONFIG.ramCooldownFrames;
     wall.recentHitFrames = Math.max(wall.recentHitFrames, WALL_CONFIG.ramCooldownFrames + 2);
 
-    // 1回の衝突につき固定1ダメージ
-    wall.pendingDamage += 1;
+    // 基本1ダメージ、ジャンプ中ヒットは2ダメージ
+    let baseDamage = body.isGrounded ? 1 : 2;
+    wall.pendingDamage += baseDamage * Math.max(1, damageScale || 1);
 
     let fx = wall.x + 2 + Math.random() * 2;
     let fy = body.y + 12 + Math.random() * Math.max(16, (body.height || 68) - 20);
     addWallEffect(fx, fy);
 }
 
-function tryApplyFollowerNearWallDamage(wall, follower, size) {
+function tryApplyFollowerNearWallDamage(wall, follower, size, followerOrderIndex = 0) {
     if (!wall || wall.destroyed || !follower) return false;
     if ((follower.wallRamCooldown || 0) > 0) return false;
     let ahead = Math.max(0, WALL_CONFIG.followerDamageAheadX || 0);
@@ -684,7 +686,8 @@ function tryApplyFollowerNearWallDamage(wall, follower, size) {
     let impact = Math.max(0, follower.vx || 0, deltaX);
     if (impact <= 0) return false;
 
-    tryApplyRamDamage(wall, follower, 'follower', impact);
+    let chainScale = Math.pow(1.1, Math.max(1, followerOrderIndex + 1));
+    tryApplyRamDamage(wall, follower, 'follower', impact, chainScale);
     return true;
 }
 
@@ -984,13 +987,14 @@ function gameLoop() {
 
         for (let j = 0; j < followerStates.length; j++) {
             let st = followerStates[j];
+            let chainScale = Math.pow(1.1, j + 1);
             let hit = resolveBodyWallCollision(st.follower, st.size, st.size, wall);
             if (hit && hit.normal === 'x') {
                 markHamsterCollisionState(st.follower, wall);
-                tryApplyRamDamage(wall, st.follower, 'follower', hit.impactSpeed);
+                tryApplyRamDamage(wall, st.follower, 'follower', hit.impactSpeed, chainScale);
                 continue;
             }
-            tryApplyFollowerNearWallDamage(wall, st.follower, st.size);
+            tryApplyFollowerNearWallDamage(wall, st.follower, st.size, j);
         }
 
         processWallCombat(wall);
@@ -1110,6 +1114,13 @@ function appendCollectionUnlockLog(log, distanceMeters) {
     return result;
 }
 
+function buildFoundHamsterResultText(newlyUnlockedHamsters) {
+    if (!newlyUnlockedHamsters || newlyUnlockedHamsters.length === 0) {
+        return '';
+    }
+    return `<p>種類: ${newlyUnlockedHamsters.join(' / ')}</p>`;
+}
+
 function pauseGame() { if (gameState !== 'playing') return; gameState = 'paused'; document.getElementById('pauseModal').style.display = 'block'; }
 
 function confirmGoHome() { 
@@ -1124,21 +1135,41 @@ function confirmGoHome() {
 function closeLog() { document.getElementById('logModal').style.display = 'none'; }
 function cancelGoHome() { gameState = 'playing'; document.getElementById('pauseModal').style.display = 'none'; gameLoop(); }
 
+function returnToNestFromGameOver() {
+    let log = pendingGameOverNestLog && pendingGameOverNestLog.length > 0
+        ? pendingGameOverNestLog.slice()
+        : ['ゲームオーバーで巣に戻りました。'];
+    pendingGameOverNestLog = null;
+    initNest();
+    document.getElementById('logContent').innerHTML = log.join('<br>');
+    document.getElementById('logModal').style.display = 'block';
+}
+
 function gameOver() {
     gameState = 'gameover'; 
-    let gameOverLog = [];
-    appendCollectionUnlockLog(gameOverLog, Math.floor(score / 10));
+    let distanceMeters = Math.floor(score / 10);
+    let savedSeeds = 0;
+    let carriedFriends = followers.length;
+    let survivedFriends = 0;
+    let gameOverDiaryLog = processTimePassage(savedSeeds, survivedFriends);
+    let diaryBaseLen = gameOverDiaryLog.length;
+    let collectionResult = appendCollectionUnlockLog(gameOverDiaryLog, distanceMeters);
+    let resultCollectionLog = gameOverDiaryLog.slice(diaryBaseLen);
+    pendingGameOverNestLog = gameOverDiaryLog.slice();
     saveData();
     const modal = document.getElementById('gameOverModal');
     const text = document.getElementById('overlayText');
-    let unlockText = gameOverLog.length > 0
-        ? `<p style="font-size:14px; color:#ffeaa7;">${gameOverLog.join('<br>')}</p>`
+    let foundHamsterText = buildFoundHamsterResultText(collectionResult.newlyUnlocked);
+    let unlockText = resultCollectionLog.length > 0
+        ? `<p style="font-size:14px; color:#ffeaa7;">${resultCollectionLog.join('<br>')}</p>`
         : '';
-    text.innerHTML = `<h2>Game Over</h2><p>Distance: ${Math.floor(score / 10)}m</p><p>種ロスト: ${seedsCollected}</p>${unlockText}<p style="font-size:14px; color:#aaa;">仲間とはぐれてしまった...</p>`;
+    let lostFriendsText = `<p style="font-size:14px; color:#aaa;">種と仲間を失いました...</p>`;
+    text.innerHTML = `<h2>Game Over</h2><p>Distance: ${distanceMeters}m</p><p>連れていた仲間の数: ${carriedFriends}匹</p>${foundHamsterText}${unlockText}${lostFriendsText}`;
     modal.style.display = 'block';
 }
 
 function resetGame(initialFollowersCount = 0) {
+    pendingGameOverNestLog = null;
     gameState = 'playing';
     document.body.classList.remove('hub-mode');
     document.body.classList.add('play-mode');

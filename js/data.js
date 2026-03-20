@@ -277,6 +277,16 @@ function processTimePassage(collectedSeeds, returnedFriendsCount) {
     let log = [];
     bankSeeds += collectedSeeds;
     log.push(`種を ${collectedSeeds} 個持ち帰りました。`);
+    let friendDelta = returnedFriendsCount - selectedFriendsCount;
+    if (friendDelta > 0) {
+        bankFriends += friendDelta;
+        log.push(`🐹 仲間が ${friendDelta} 匹ふえました。`);
+    } else if (friendDelta < 0) {
+        bankFriends = Math.max(0, bankFriends + friendDelta);
+        log.push(`💥 仲間が ${Math.abs(friendDelta)} 匹へりました。`);
+    } else {
+        log.push('🐹 仲間の増減はありませんでした。');
+    }
 
     let breeding = updateBreeding();
     if (breeding.newBabiesTotal > 0) log.push(`👶 <span style="color:#fd79a8">赤ちゃんが ${breeding.newBabiesTotal} 匹生まれました！</span>`);
