@@ -447,10 +447,29 @@ function updateFarmUI() {
     if (farmRows >= FARM_CONFIG.maxRows) {
         expandBtn.disabled = true;
         expandBtn.innerText = '🔨 最大';
+        expandBtn.style.backgroundColor = '#7f8c8d';
+        expandBtn.style.color = '#dfe6e9';
+        expandBtn.style.borderColor = '#555';
+        expandBtn.style.boxShadow = 'none';
+        expandBtn.style.opacity = '0.7';
     } else {
         let cost = getExpansionCost();
-        expandBtn.disabled = bankSeeds < cost;
-        expandBtn.innerText = '🔨 拡張 (' + cost + ')';
+        let canExpand = bankSeeds >= cost;
+        expandBtn.disabled = !canExpand;
+        expandBtn.innerText = '🔨 拡張 (' + cost + '個)';
+        if (canExpand) {
+            expandBtn.style.backgroundColor = '#27ae60';
+            expandBtn.style.color = '#fff';
+            expandBtn.style.borderColor = '#333';
+            expandBtn.style.boxShadow = '0 4px 0 #999';
+            expandBtn.style.opacity = '1';
+        } else {
+            expandBtn.style.backgroundColor = '#7f8c8d';
+            expandBtn.style.color = '#dfe6e9';
+            expandBtn.style.borderColor = '#555';
+            expandBtn.style.boxShadow = 'none';
+            expandBtn.style.opacity = '0.7';
+        }
     }
 }
 
