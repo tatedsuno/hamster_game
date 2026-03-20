@@ -398,7 +398,7 @@ function nestLoop() {
     nestMainHamBottomY = myY + mySize / 2;
 
     let excessSeeds = bankSeeds - nestSeeds.length;
-    if (excessSeeds > 0) drawStaticSeedPile(canvas.width / 2, floorY, excessSeeds);
+    if (excessSeeds > 0) drawStaticSeedPile(canvas.width / 2, floorY, excessSeeds, bankSeeds);
     nestSeeds.forEach(s => s.update()); solvePhysics(); nestSeeds.forEach(s => s.draw());
     
     nestHamsters.sort((a, b) => a.y - b.y);
@@ -412,6 +412,11 @@ function nestLoop() {
     else { ctx.fillStyle = '#ff3f34'; ctx.fillRect(0, 0, mySize, mySize); }
     ctx.restore();
 
+    ctx.fillStyle = '#7a5a0b';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${bankFriends} Hamsters`, canvas.width / 2, myY + mySize / 2 + 24);
+
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.font = '16px sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
@@ -422,7 +427,7 @@ function nestLoop() {
     requestAnimationFrame(nestLoop);
 }
 
-function drawStaticSeedPile(x, y, count) {
+function drawStaticSeedPile(x, y, count, totalCount = count) {
     let totalImages = Math.max(1, Math.ceil(count / 1000));
     let baseW = 240;
     let baseH = 120;
@@ -465,8 +470,11 @@ function drawStaticSeedPile(x, y, count) {
     }
 
     let topY = y + 15 - baseH - (layers.length - 1) * spacingY;
-    ctx.fillStyle = '#9a7d0a'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(`+ ${count} Seeds`, x, topY - 5);
+    let labelY = topY - 5;
+    ctx.fillStyle = '#9a7d0a';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${totalCount} Seeds`, x, labelY);
 }
 
 function solvePhysics() {
