@@ -100,6 +100,67 @@ body.play-mode {
     border-bottom: 1px solid #e1b12c;
 }
 
+.scene-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+
+.scene-header-top .scene-header-title {
+    margin-bottom: 0;
+    flex: 1;
+    min-width: 0;
+}
+
+.nest-settings-btn {
+    pointer-events: auto;
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #2d3436;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nest-settings-btn:active {
+    transform: scale(0.96);
+}
+
+.settings-modal-text {
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 12px;
+    text-align: left;
+}
+
+.modal-confirm {
+    z-index: 85;
+}
+
+#nestSettingsModal {
+    z-index: 82;
+}
+
+#resetSpeciesModal {
+    z-index: 86;
+}
+
+.reset-species-picker {
+    text-align: left;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
 .scene-header-title {
     font-size: 15px;
     font-weight: 700;

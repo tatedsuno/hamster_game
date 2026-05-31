@@ -123,10 +123,8 @@ const player = {
             detachedFriends.push(new DetachedFriend(this.x, this.y + this.height, sacrificed.speciesName));
             let currentMax = getMaxSeedCapacity(); if (seedsCollected > currentMax) seedsCollected = currentMax; updateSeedDisplay();
             sacrificeCount++;
-            if (sacrificeCount >= 2) {
-                isBoosted = true;
-                speed = Math.min(speed + baseSpeed * 0.15, baseSpeed * 2.5);
-            }
+            isBoosted = true;
+            speed += baseSpeed * 0.15;
         }
     },
     land: function(y) {
@@ -284,7 +282,8 @@ function spawnWallBreakRewards(wall) {
     for (let i = 0; i < friendDropCount; i++) {
         let ix = dropCenterX + (Math.random() - 0.5) * (dropSpread * 0.75);
         let iy = -40 - Math.random() * 260;
-        collectibles.push(new Collectible(ix, iy, true, pickHamsterSpecies(i)));
+        let rewardSpecies = getWallRewardHamsterSpecies(wall.distanceMeters);
+        collectibles.push(new Collectible(ix, iy, true, rewardSpecies));
     }
 }
 
@@ -327,7 +326,7 @@ class SlopePlatform {
 }
 
 class BreakableWall {
-    constructor(x, groundY, hp) {
+    constructor(x, groundY, hp, distanceMeters = null) {
         this.id = ++wallSerial;
         this.x = x;
         this.width = WALL_CONFIG.width;
@@ -335,6 +334,9 @@ class BreakableWall {
         this.y = 0;
         this.hp = hp;
         this.maxHp = hp;
+        this.distanceMeters = distanceMeters !== null
+            ? Math.max(0, Math.floor(distanceMeters))
+            : Math.max(0, Math.floor((x - 150) / WALL_CONFIG.pxPerMeter));
         this.engaged = false;
         this.destroyed = false;
         this.pendingDamage = 0;
@@ -427,7 +429,7 @@ function spawnBreakableWall() {
     let groundY = 0;
     let distanceMeters = Math.max(0, (spawnX - 150) / WALL_CONFIG.pxPerMeter);
     let hp = Math.max(1, Math.floor(distanceMeters / 10));
-    walls.push(new BreakableWall(spawnX, groundY, hp));
+    walls.push(new BreakableWall(spawnX, groundY, hp, distanceMeters));
 }
 
 function hasGroundCoverage(startX, endX) {
@@ -528,7 +530,7 @@ function resolveBodyWallCollision(body, bodyWidth, bodyHeight, wall) {
     if (preferHorizontal || minX <= minY) {
         if (overlapLeft <= overlapRight) body.x -= overlapLeft + 0.1;
         else body.x += overlapRight + 0.1;
-        let bounceSpeed = Math.max(0, impactVx);
+        let bounceSpeed = body === player ? baseSpeed : Math.max(0, impactVx);
         body.vx = -bounceSpeed;
         body.isGrounded = false;
         return { normal: 'x', impactSpeed: Math.max(0, impactVx) };

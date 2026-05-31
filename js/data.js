@@ -19,15 +19,15 @@ let gameState = 'loading';
 let bankSeeds = parseInt(localStorage.getItem('ham_seeds') || '0');
 let bankFriends = parseInt(localStorage.getItem('ham_friends') || '0');
 const HAMSTER_COLLECTION = [
-    'ブルーサファイアジャンガリアンハムスター',
-    'ゴールデンハムスター',
     'ジャガリアンハムスター',
+    'ゴールデンハムスター',
+    'ブルーサファイアジャンガリアンハムスター',
     'パールホワイトジャンガリアンハムスター',
     'ロボロフスキーハムスター',
     'プディングジャンガリアンハムスター',
     'キンクマ'
 ];
-const MAIN_HAMSTER_DEFAULT = 'ブルーサファイアジャンガリアンハムスター';
+const MAIN_HAMSTER_DEFAULT = 'ジャガリアンハムスター';
 const HAMSTER_SPRITE_KEYS = {
     'ブルーサファイアジャンガリアンハムスター': '',
     'ゴールデンハムスター': 'golden',
@@ -41,7 +41,18 @@ const HAMSTER_DRAW_SCALES = {
     'ゴールデンハムスター': 1.2,
     'キンクマ': 1.2
 };
-const HAMSTER_UNLOCK_DISTANCE_STEP = 1000;
+const HAMSTER_UNLOCK_DISTANCE_STEP = 500;
+const GAME_SAVE_KEYS = [
+    'ham_seeds',
+    'ham_friends',
+    'ham_breeding',
+    'ham_farm_plots',
+    'ham_farm_workers',
+    'ham_farm_rows',
+    'ham_last_worker_action',
+    'ham_main_species',
+    'ham_best_distance'
+];
 let mainHamsterName = localStorage.getItem('ham_main_species') || MAIN_HAMSTER_DEFAULT;
 let bestDistanceMeters = parseInt(localStorage.getItem('ham_best_distance') || '0');
 let breedingQueue = JSON.parse(localStorage.getItem('ham_breeding') || '[]');
@@ -123,6 +134,8 @@ if (!Number.isFinite(bestDistanceMeters) || bestDistanceMeters < 0) {
     bestDistanceMeters = 0;
 }
 let selectedBreedingSpecies = mainHamsterName;
+let pendingResetUnlockedSpecies = [];
+let pendingResetInitialSpecies = MAIN_HAMSTER_DEFAULT;
 
 function cancelPendingDrag() {
     pendingDragHamster = null;
@@ -141,13 +154,90 @@ function saveData() {
     localStorage.setItem('ham_best_distance', bestDistanceMeters);
 }
 
+function showNestSettings() {
+    let modal = document.getElementById('nestSettingsModal');
+    if (modal) modal.style.display = 'block';
+}
+
+function closeNestSettings() {
+    let modal = document.getElementById('nestSettingsModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function requestGameReset() {
+    closeNestSettings();
+    let modal = document.getElementById('resetConfirmModal');
+    if (modal) modal.style.display = 'block';
+}
+
+function cancelGameReset() {
+    let modal = document.getElementById('resetConfirmModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function getUnlockedHamstersAtDistance(distanceMeters) {
+    return HAMSTER_COLLECTION.slice(0, getUnlockedHamsterCount(distanceMeters));
+}
+
+function renderResetSpeciesPicker() {
+    let container = document.getElementById('resetSpeciesPicker');
+    if (!container) return;
+    let html = '<div class="breeding-species-list">';
+    pendingResetUnlockedSpecies.forEach((name, i) => {
+        let sel = name === pendingResetInitialSpecies;
+        html += `<button type="button" class="breed-species-btn${sel ? ' selected' : ''}" onclick="selectResetInitialSpeciesByIndex(${i})">${name}</button>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function selectResetInitialSpeciesByIndex(index) {
+    if (index < 0 || index >= pendingResetUnlockedSpecies.length) return;
+    pendingResetInitialSpecies = pendingResetUnlockedSpecies[index];
+    renderResetSpeciesPicker();
+}
+
+function confirmGameReset() {
+    cancelGameReset();
+    pendingResetUnlockedSpecies = getUnlockedHamstersAtDistance(bestDistanceMeters);
+    if (!pendingResetUnlockedSpecies.length) {
+        pendingResetUnlockedSpecies = [MAIN_HAMSTER_DEFAULT];
+    }
+    pendingResetInitialSpecies = pendingResetUnlockedSpecies.includes(mainHamsterName)
+        ? mainHamsterName
+        : pendingResetUnlockedSpecies[0];
+    renderResetSpeciesPicker();
+    let modal = document.getElementById('resetSpeciesModal');
+    if (modal) modal.style.display = 'block';
+}
+
+function cancelResetSpeciesPicker() {
+    let modal = document.getElementById('resetSpeciesModal');
+    if (modal) modal.style.display = 'none';
+    pendingResetUnlockedSpecies = [];
+}
+
+function finalizeGameReset() {
+    let species = resolveHamsterSpeciesName(pendingResetInitialSpecies);
+    GAME_SAVE_KEYS.forEach(key => localStorage.removeItem(key));
+    localStorage.setItem('ham_main_species', species);
+    location.reload();
+}
+
 function getUnlockedHamsterCount(distanceMeters) {
     let unlocked = 1 + Math.floor(distanceMeters / HAMSTER_UNLOCK_DISTANCE_STEP);
     return Math.max(1, Math.min(HAMSTER_COLLECTION.length, unlocked));
 }
 
+function getEffectiveUnlockDistanceMeters() {
+    if (typeof score === 'number' && (gameState === 'playing' || gameState === 'paused')) {
+        return Math.max(bestDistanceMeters, Math.max(0, Math.floor(score / 10)));
+    }
+    return bestDistanceMeters;
+}
+
 function getUnlockedHamsters() {
-    return HAMSTER_COLLECTION.slice(0, getUnlockedHamsterCount(bestDistanceMeters));
+    return HAMSTER_COLLECTION.slice(0, getUnlockedHamsterCount(getEffectiveUnlockDistanceMeters()));
 }
 
 function resolveHamsterSpeciesName(speciesName) {
@@ -160,6 +250,15 @@ function pickHamsterSpecies(index = 0) {
     if (!unlocked.length) return MAIN_HAMSTER_DEFAULT;
     let i = ((index % unlocked.length) + unlocked.length) % unlocked.length;
     return unlocked[i];
+}
+
+function getWallRewardHamsterSpecies(distanceMeters) {
+    let distance = Math.max(0, Math.floor(distanceMeters || 0));
+    let index = Math.min(
+        HAMSTER_COLLECTION.length - 1,
+        Math.floor(distance / HAMSTER_UNLOCK_DISTANCE_STEP)
+    );
+    return HAMSTER_COLLECTION[index];
 }
 
 function cycleMainHamsterSpecies() {
@@ -176,8 +275,8 @@ function cycleMainHamsterSpecies() {
 function getHamsterSpritePath(speciesName, pose) {
     let name = resolveHamsterSpeciesName(speciesName);
     let key = HAMSTER_SPRITE_KEYS[name];
-    if (key) return `ham.${key}.${pose}.png`;
-    return `ham.${pose}.png`;
+    if (key === undefined || key === '') return `ham.${pose}.png`;
+    return `ham.${key}.${pose}.png`;
 }
 
 function getHamsterDrawScale(speciesName) {

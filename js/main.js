@@ -50,16 +50,16 @@ function initAllAssets() {
     }
 }
 
-function getHamsterSprite(speciesName, pose) {
-    let name = resolveHamsterSpeciesName(speciesName);
-    let bucket = hamsterSprites[name] || hamsterSprites[MAIN_HAMSTER_DEFAULT];
-    if (!bucket) return null;
-    return bucket[pose] || bucket.idle;
-}
-
 function getHamsterImage(speciesName, pose) {
-    let sp = getHamsterSprite(speciesName, pose);
-    return sp && sp.loaded ? sp.img : null;
+    let name = resolveHamsterSpeciesName(speciesName);
+    let bucket = hamsterSprites[name];
+    if (!bucket) return null;
+    let poseOrder = [pose, 'idle', 'run', 'jump', 'djump', 'fall'];
+    for (let p of poseOrder) {
+        let sp = bucket[p];
+        if (sp && sp.loaded) return sp.img;
+    }
+    return null;
 }
 
 function drawHamsterSprite(speciesName, pose, x, y, w, h, options = {}) {

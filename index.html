@@ -9,7 +9,10 @@
 <body>
 
 <div id="nestHeader" class="scene-header">
-    <div class="scene-header-title">🏠 巣のホーム</div>
+    <div class="scene-header-top">
+        <div class="scene-header-title">🏠 巣のホーム</div>
+        <button type="button" id="nestSettingsBtn" class="nest-settings-btn" onclick="showNestSettings()" aria-label="設定">⚙️</button>
+    </div>
     <div class="scene-header-row">
         <div class="scene-info-chip">🌻 たね <b id="bankSeeds">0</b></div>
         <div class="scene-info-chip">🐹 おとな <b id="bankFriends">0</b></div>
@@ -94,6 +97,30 @@
         </div>
         <div id="hamsterEncyclopediaContent" class="encyclopedia-list"></div>
         <button class="btn" onclick="closeHamsterEncyclopedia()">閉じる</button>
+    </div>
+
+    <div id="nestSettingsModal" class="modal">
+        <h3>⚙️ 設定</h3>
+        <p class="settings-modal-text">ゲームの進行データを管理します。</p>
+        <button class="btn" style="background:#e74c3c; color:#fff;" onclick="requestGameReset()">最初からリセット</button>
+        <br><br>
+        <button class="btn" onclick="closeNestSettings()">閉じる</button>
+    </div>
+
+    <div id="resetConfirmModal" class="modal modal-confirm">
+        <h3>⚠️ 本当にリセットしますか？</h3>
+        <p class="settings-modal-text">種・仲間・図鑑・畑のデータなど<br>すべて消えて最初からになります。</p>
+        <button class="btn" style="background:#e74c3c; color:#fff;" onclick="confirmGameReset()">はい、リセットする</button>
+        <button class="btn" onclick="cancelGameReset()">いいえ</button>
+    </div>
+
+    <div id="resetSpeciesModal" class="modal modal-confirm">
+        <h3>🐹 初期ハムスターを選ぶ</h3>
+        <p class="settings-modal-text">前回までに解放していた種類から、<br>リセット後のメインハムスターを選べます。</p>
+        <div id="resetSpeciesPicker" class="reset-species-picker"></div>
+        <br>
+        <button class="btn" style="background:#00cec9; color:#fff;" onclick="finalizeGameReset()">この種で始める</button>
+        <button class="btn" onclick="cancelResetSpeciesPicker()">キャンセル</button>
     </div>
 
     <div id="pageIndicator">
