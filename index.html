@@ -20,7 +20,7 @@
         </div>
     </div>
     <div class="scene-header-row scene-header-row-secondary">
-        <div class="scene-info-chip">📘 <span id="encyclopediaProgressInline">1 / 10</span> <span id="openEncyclopediaBtn" onclick="showHamsterEncyclopedia()">開く</span></div>
+        <div class="scene-info-chip">📘 <span id="encyclopediaProgressInline">1 / 7</span> <span id="openEncyclopediaBtn" onclick="showHamsterEncyclopedia()">開く</span></div>
     </div>
 </div>
 
@@ -60,6 +60,7 @@
 <div id="breedingModal" class="modal">
     <h3>💖 家族を増やしますか？</h3>
         <div id="breedingConditions" style="text-align:left; display:inline-block; line-height:1.8;"></div>
+        <div id="breedingSpeciesPicker" style="text-align:left; display:inline-block; max-width:100%;"></div>
     <br><br>
         <button id="breedConfirmBtn" class="btn" style="background:#fd79a8; color:#fff;" onclick="confirmBreeding()">はい (繁殖する)</button>
     <button class="btn" onclick="cancelBreeding()">いいえ (やめる)</button>
@@ -88,7 +89,7 @@
     <div id="hamsterEncyclopediaModal" class="modal">
         <h3>📘 ハムスター図鑑</h3>
         <div style="font-size:14px; margin-bottom:8px;">
-            解放: <b id="encyclopediaProgress">1 / 10</b><br>
+            解放: <b id="encyclopediaProgress">1 / 7</b><br>
             最長距離: <b id="encyclopediaBestDistance">0m</b>
         </div>
         <div id="hamsterEncyclopediaContent" class="encyclopedia-list"></div>

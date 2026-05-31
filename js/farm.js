@@ -21,7 +21,8 @@ class FloatingText {
 }
 
 class FarmWorkerHamster {
-    constructor(startX, startY) {
+    constructor(startX, startY, speciesName = null) {
+        this.speciesName = resolveHamsterSpeciesName(speciesName || pickHamsterSpecies(farmWorkerHamsters.length));
         this.x = startX || canvas.width / 2 + (Math.random() - 0.5) * 200;
         this.y = startY || canvas.height / 2;
         this.groundY = this.y;
@@ -185,12 +186,13 @@ class FarmWorkerHamster {
         if (this.isDragging) ctx.scale(1.1, 1.1);
         if (this.flip) ctx.scale(-1, 1);
         let isMoving = this.state === 'moving_to_target' || this.state === 'wandering';
-        let img;
-        if ((this.isThrown || this.isDragging) && sprites.fall.loaded) img = sprites.fall.img;
-        else if (isMoving && sprites.run.loaded) img = sprites.run.img;
-        else img = sprites.idle.loaded ? sprites.idle.img : null;
-        if (img) ctx.drawImage(img, -this.size / 2, -this.size / 2, this.size, this.size);
-        else { ctx.fillStyle = '#ff9f43'; ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size); }
+        let pose = resolveHamsterPose({
+            isFall: this.isThrown || this.isDragging,
+            isGrounded: true,
+            jumpCount: 0,
+            isMoving: isMoving
+        });
+        drawHamsterSprite(this.speciesName, pose, 0, 0, this.size, this.size, { anchor: 'center', fallbackColor: '#ff9f43' });
         if (this.boosted) {
             ctx.fillStyle = '#f1c40f';
             let sparkle = Math.sin(Date.now() / 100 + this.hopOffset) * 3;
@@ -398,7 +400,7 @@ function initFarm() {
         let plotCy = fLayout.offsetY + r * (fLayout.cellSize + fLayout.gap) + fLayout.cellSize / 2;
         let startX = plotCx + (Math.random() - 0.5) * fLayout.cellSize * 0.8;
         let startY = plotCy + fLayout.cellSize * 0.3 + Math.random() * 20;
-        let w = new FarmWorkerHamster(startX, startY);
+        let w = new FarmWorkerHamster(startX, startY, pickHamsterSpecies(i));
         w.groundY = startY;
         let rand = Math.random();
         let plot = farmPlots[plotIdx];

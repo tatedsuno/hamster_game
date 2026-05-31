@@ -21,16 +21,26 @@ let bankFriends = parseInt(localStorage.getItem('ham_friends') || '0');
 const HAMSTER_COLLECTION = [
     'ブルーサファイアジャンガリアンハムスター',
     'ゴールデンハムスター',
-    'キンクマ',
     'ジャガリアンハムスター',
     'パールホワイトジャンガリアンハムスター',
-    'プディングジャンガリアンハムスター',
     'ロボロフスキーハムスター',
-    'キャンベルハムスター',
-    'チャイニーズハムスター',
-    'ヨーロッパハムスター'
+    'プディングジャンガリアンハムスター',
+    'キンクマ'
 ];
 const MAIN_HAMSTER_DEFAULT = 'ブルーサファイアジャンガリアンハムスター';
+const HAMSTER_SPRITE_KEYS = {
+    'ブルーサファイアジャンガリアンハムスター': '',
+    'ゴールデンハムスター': 'golden',
+    'キンクマ': 'kinkuma',
+    'ジャガリアンハムスター': 'jungarian',
+    'パールホワイトジャンガリアンハムスター': 'pearl_white',
+    'プディングジャンガリアンハムスター': 'pudding',
+    'ロボロフスキーハムスター': 'roborovski'
+};
+const HAMSTER_DRAW_SCALES = {
+    'ゴールデンハムスター': 1.2,
+    'キンクマ': 1.2
+};
 const HAMSTER_UNLOCK_DISTANCE_STEP = 1000;
 let mainHamsterName = localStorage.getItem('ham_main_species') || MAIN_HAMSTER_DEFAULT;
 let bestDistanceMeters = parseInt(localStorage.getItem('ham_best_distance') || '0');
@@ -40,8 +50,9 @@ breedingQueue.forEach(q => {
         q.startedAt = Date.now();
         delete q.tripsRemaining;
     }
+    if (!q.speciesName) q.speciesName = MAIN_HAMSTER_DEFAULT;
 });
-let selectedFriendsCount = 0; 
+let selectedFriendsCount = 0;
 
 let farmWorkers = parseInt(localStorage.getItem('ham_farm_workers') || '0');
 let farmRows = parseInt(localStorage.getItem('ham_farm_rows') || String(FARM_CONFIG.initialRows));
@@ -111,9 +122,11 @@ if (!HAMSTER_COLLECTION.includes(mainHamsterName)) {
 if (!Number.isFinite(bestDistanceMeters) || bestDistanceMeters < 0) {
     bestDistanceMeters = 0;
 }
+let selectedBreedingSpecies = mainHamsterName;
 
 function cancelPendingDrag() {
     pendingDragHamster = null;
+    pendingMainHamsterTap = false;
 }
 
 function saveData() {
@@ -135,6 +148,41 @@ function getUnlockedHamsterCount(distanceMeters) {
 
 function getUnlockedHamsters() {
     return HAMSTER_COLLECTION.slice(0, getUnlockedHamsterCount(bestDistanceMeters));
+}
+
+function resolveHamsterSpeciesName(speciesName) {
+    if (speciesName && HAMSTER_COLLECTION.includes(speciesName)) return speciesName;
+    return MAIN_HAMSTER_DEFAULT;
+}
+
+function pickHamsterSpecies(index = 0) {
+    let unlocked = getUnlockedHamsters();
+    if (!unlocked.length) return MAIN_HAMSTER_DEFAULT;
+    let i = ((index % unlocked.length) + unlocked.length) % unlocked.length;
+    return unlocked[i];
+}
+
+function cycleMainHamsterSpecies() {
+    let unlocked = getUnlockedHamsters();
+    if (unlocked.length <= 1) return mainHamsterName;
+    let idx = unlocked.indexOf(mainHamsterName);
+    if (idx < 0) idx = 0;
+    mainHamsterName = unlocked[(idx + 1) % unlocked.length];
+    saveData();
+    updateNestUI();
+    return mainHamsterName;
+}
+
+function getHamsterSpritePath(speciesName, pose) {
+    let name = resolveHamsterSpeciesName(speciesName);
+    let key = HAMSTER_SPRITE_KEYS[name];
+    if (key) return `ham.${key}.${pose}.png`;
+    return `ham.${pose}.png`;
+}
+
+function getHamsterDrawScale(speciesName) {
+    let name = resolveHamsterSpeciesName(speciesName);
+    return HAMSTER_DRAW_SCALES[name] || 1;
 }
 
 function updateHamsterCollectionByDistance(distanceMeters) {
@@ -190,7 +238,23 @@ function closeHamsterEncyclopedia() {
 // ==========================================
 // 繁殖・消費システム
 // ==========================================
-function startBreedingCheck() {
+function getBreedingQueueSpecies(q) {
+    return resolveHamsterSpeciesName(q && q.speciesName);
+}
+
+function selectBreedingSpeciesByIndex(index) {
+    let unlocked = getUnlockedHamsters();
+    if (index < 0 || index >= unlocked.length) return;
+    selectedBreedingSpecies = unlocked[index];
+    renderBreedingModalContent();
+}
+
+function renderBreedingModalContent() {
+    let unlocked = getUnlockedHamsters();
+    if (!unlocked.includes(selectedBreedingSpecies)) {
+        selectedBreedingSpecies = unlocked[0] || MAIN_HAMSTER_DEFAULT;
+    }
+
     let hasSeeds = bankSeeds >= BREEDING_COST_SEEDS;
     let hasFriends = bankFriends >= 1;
 
@@ -200,21 +264,39 @@ function startBreedingCheck() {
     html += `<span style="font-size:12px; color:#aaa;">※親は育児のため冒険に出られなくなります</span>`;
     document.getElementById('breedingConditions').innerHTML = html;
 
+    let picker = document.getElementById('breedingSpeciesPicker');
+    if (picker) {
+        let pickerHtml = '<div style="margin:10px 0 6px; font-size:13px; font-weight:bold; color:#ffeaa7;">育てるハムスターの種類</div>';
+        pickerHtml += '<div class="breeding-species-list">';
+        unlocked.forEach((name, i) => {
+            let sel = name === selectedBreedingSpecies;
+            pickerHtml += `<button type="button" class="breed-species-btn${sel ? ' selected' : ''}" onclick="selectBreedingSpeciesByIndex(${i})">${name}</button>`;
+        });
+        pickerHtml += '</div>';
+        picker.innerHTML = pickerHtml;
+    }
+
     let btn = document.getElementById('breedConfirmBtn');
     if (hasSeeds && hasFriends) {
         btn.disabled = false; btn.style.opacity = 1;
     } else {
         btn.disabled = true; btn.style.opacity = 0.5;
     }
+}
+
+function startBreedingCheck() {
+    selectedBreedingSpecies = mainHamsterName;
+    renderBreedingModalContent();
     document.getElementById('breedingModal').style.display = 'block';
 }
 
 function confirmBreeding() {
+    let species = resolveHamsterSpeciesName(selectedBreedingSpecies);
     if (bankSeeds >= BREEDING_COST_SEEDS && bankFriends >= 1) {
         bankSeeds -= BREEDING_COST_SEEDS;
         bankFriends -= 1;
         let startedAt = Date.now();
-        breedingQueue.push({ type: 'pregnant', startedAt: startedAt, count: 1 });
+        breedingQueue.push({ type: 'pregnant', startedAt: startedAt, count: 1, speciesName: species });
         saveData(); updateNestUI();
         nestSeeds.splice(0, Math.min(nestSeeds.length, 50));
         let converted = false;
@@ -223,6 +305,7 @@ function confirmBreeding() {
                 h.stage = 3;
                 h.size = 95;
                 h.state = 'pregnant';
+                h.speciesName = species;
                 h.breedingStartedAt = startedAt;
                 h.vx = 0;
                 converted = true;
@@ -231,7 +314,7 @@ function confirmBreeding() {
             }
         }
         if (!converted) {
-            nestHamsters.push(new NestHamster(3, startedAt));
+            nestHamsters.push(new NestHamster(3, startedAt, species));
         }
     }
     closeBreedingModal();
@@ -307,7 +390,7 @@ function renderBreedingInfoContent() {
             let remaining = Math.max(0, BREEDING_CONFIG.pregnancyTime - elapsed);
             let pct = Math.floor(progress * 100);
             let timeStr = formatTimeRemaining(remaining);
-            html += `<div style="margin-bottom:8px;">🤰 妊娠中 (${q.count}匹) — ${timeStr}<br>`;
+            html += `<div style="margin-bottom:8px;">🤰 妊娠中 (${getBreedingQueueSpecies(q)}) — ${timeStr}<br>`;
             html += `<div style="background:rgba(0,0,0,0.15);border-radius:4px;height:10px;margin-top:3px;">`;
             html += `<div style="background:#fd79a8;width:${pct}%;height:100%;border-radius:4px;transition:width 0.5s;"></div></div></div>`;
         }
@@ -320,7 +403,7 @@ function renderBreedingInfoContent() {
             let pct = Math.floor(progress * 100);
             let timeStr = formatTimeRemaining(remaining);
             let stageLabel = progress < 0.5 ? '赤ちゃん' : 'もうすぐ大人';
-            html += `<div style="margin-bottom:8px;">👶 ${stageLabel} (${q.count}匹) — ${timeStr}<br>`;
+            html += `<div style="margin-bottom:8px;">👶 ${stageLabel} (${getBreedingQueueSpecies(q)}・${q.count}匹) — ${timeStr}<br>`;
             html += `<div style="background:rgba(0,0,0,0.15);border-radius:4px;height:10px;margin-top:3px;">`;
             html += `<div style="background:#00cec9;width:${pct}%;height:100%;border-radius:4px;transition:width 0.5s;"></div></div></div>`;
         }
@@ -347,3 +430,5 @@ function updatePageIndicator(page) {
     document.getElementById('dotNest').className = 'page-dot' + (page === 'nest' ? ' active' : '');
     document.getElementById('dotFarm').className = 'page-dot' + (page === 'farm' ? ' active' : '');
 }
+
+if (typeof initAllAssets === 'function') initAllAssets();

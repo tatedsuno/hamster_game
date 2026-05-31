@@ -20,6 +20,7 @@ let swipeTransitionLocked = false;
 let activeSwipeRevealX = 0;
 let activeSwipeDirection = 0;
 let isGestureTracking = false;
+let pendingMainHamsterTap = false;
 
 const swipePreviewEl = document.getElementById('swipePreview');
 const swipePreviewCanvasEl = document.getElementById('swipePreviewCanvas');
@@ -332,6 +333,13 @@ function handleInputStart(e) {
     cy = (touchStartY - rect.top) * scaleY;
 
     if (gameState === 'nest') {
+        if (isPointOnNestMainHamster(cx, cy)) {
+            pendingMainHamsterTap = true;
+            pendingDragCx = cx;
+            pendingDragCy = cy;
+            return;
+        }
+
         for(let h of nestHamsters) {
             let dx = h.x - cx; 
             let dy = (h.y - h.size/2) - cy;
@@ -406,6 +414,11 @@ function handleInputMove(e) {
     let gameY = (cy - rect.top) * scaleY;
     let diffX = cx - touchStartX;
     let diffY = cy - touchStartY;
+
+    if (pendingMainHamsterTap && !draggedHamster) {
+        let moveDist = Math.sqrt((gameX - pendingDragCx) ** 2 + (gameY - pendingDragCy) ** 2);
+        if (moveDist > DRAG_START_THRESHOLD) pendingMainHamsterTap = false;
+    }
 
     if (pendingDragHamster && !draggedHamster) {
         let moveDist = Math.sqrt((gameX - pendingDragCx) ** 2 + (gameY - pendingDragCy) ** 2);
@@ -485,6 +498,29 @@ function handleInputEnd(e) {
         return;
     }
 
+    let touchEndX = 0;
+    let touchEndY = 0;
+    if (e.type === 'touchend') {
+        touchEndX = e.changedTouches[0].clientX;
+        touchEndY = e.changedTouches[0].clientY;
+    } else {
+        touchEndX = e.clientX;
+        touchEndY = e.clientY;
+    }
+    let diffX = touchEndX - touchStartX;
+    let diffY = touchEndY - touchStartY;
+
+    if (pendingMainHamsterTap) {
+        pendingMainHamsterTap = false;
+        let moved = Math.abs(diffX) > DRAG_START_THRESHOLD || Math.abs(diffY) > DRAG_START_THRESHOLD;
+        if (!moved && gameState === 'nest') {
+            cycleMainHamsterSpecies();
+            spawnMainHamsterGrowEffect();
+        }
+        cancelSwipePreviewWithAnimation();
+        return;
+    }
+
     if (pendingDragHamster) {
         let tappedHamster = pendingDragHamster;
         pendingDragHamster = null;
@@ -513,10 +549,6 @@ function handleInputEnd(e) {
         return;
     }
 
-    let touchEndX = 0; let touchEndY = 0;
-    if(e.type === 'touchend') { touchEndX = e.changedTouches[0].clientX; touchEndY = e.changedTouches[0].clientY; }
-    else { touchEndX = e.clientX; touchEndY = e.clientY; }
-    let diffX = touchEndX - touchStartX; let diffY = touchEndY - touchStartY;
     let wasFarmTouchScrolling = farmTouchScrolling;
     farmTouchScrolling = false;
 

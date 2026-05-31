@@ -1,29 +1,98 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+const HAMSTER_POSES = ['idle', 'run', 'jump', 'djump', 'fall'];
+let hamsterSprites = {};
 const sprites = {
-    idle: { img: new Image(), loaded: false },
-    run: { img: new Image(), loaded: false },
-    jump: { img: new Image(), loaded: false },
-    djump: { img: new Image(), loaded: false },
-    fall: { img: new Image(), loaded: false },
     seed: { img: new Image(), loaded: false },
     seedMount: { img: new Image(), loaded: false }
 };
 
-sprites.idle.img.src = 'ham.idle.png';
-sprites.run.img.src = 'ham.run.png';
-sprites.jump.img.src = 'ham.jump.png';
-sprites.djump.img.src = 'ham.djump.png';
-sprites.fall.img.src = 'ham.fall.png';
-sprites.seed.img.src = 'seed.png';
-sprites.seedMount.img.src = 'seed_mount.png';
-
 let seedThumb = null;
 
 let imagesLoadedCount = 0;
-const totalImages = Object.keys(sprites).length;
+let totalImages = 0;
 let gameStarted = false;
+let assetsInitialized = false;
+
+function bindImageLoad(entry, onLoadExtra) {
+    entry.img.onload = function() {
+        entry.loaded = true;
+        if (onLoadExtra) onLoadExtra();
+        checkAllImagesLoaded();
+    };
+    entry.img.onerror = function() {
+        console.warn("Image load failed: " + entry.img.src);
+        entry.loaded = false;
+        checkAllImagesLoaded();
+    };
+}
+
+function initAllAssets() {
+    if (assetsInitialized) return;
+    assetsInitialized = true;
+    totalImages = HAMSTER_COLLECTION.length * HAMSTER_POSES.length + 2;
+    imagesLoadedCount = 0;
+
+    bindImageLoad(sprites.seed, createSeedThumbnail);
+    bindImageLoad(sprites.seedMount);
+    sprites.seed.img.src = 'seed.png';
+    sprites.seedMount.img.src = 'seed_mount.png';
+
+    for (let name of HAMSTER_COLLECTION) {
+        hamsterSprites[name] = {};
+        for (let pose of HAMSTER_POSES) {
+            let entry = { img: new Image(), loaded: false };
+            hamsterSprites[name][pose] = entry;
+            bindImageLoad(entry);
+            entry.img.src = getHamsterSpritePath(name, pose);
+        }
+    }
+}
+
+function getHamsterSprite(speciesName, pose) {
+    let name = resolveHamsterSpeciesName(speciesName);
+    let bucket = hamsterSprites[name] || hamsterSprites[MAIN_HAMSTER_DEFAULT];
+    if (!bucket) return null;
+    return bucket[pose] || bucket.idle;
+}
+
+function getHamsterImage(speciesName, pose) {
+    let sp = getHamsterSprite(speciesName, pose);
+    return sp && sp.loaded ? sp.img : null;
+}
+
+function drawHamsterSprite(speciesName, pose, x, y, w, h, options = {}) {
+    let img = getHamsterImage(speciesName, pose);
+    let scale = getHamsterDrawScale(speciesName);
+    let dw = w * scale;
+    let dh = h * scale;
+    let anchor = options.anchor || 'topleft';
+    let dx, dy;
+
+    if (anchor === 'center') {
+        dx = x - dw / 2;
+        dy = y - dh / 2;
+    } else if (anchor === 'bottom-center') {
+        dx = x - dw / 2;
+        dy = y - dh;
+    } else {
+        dx = x + (w - dw) / 2;
+        dy = y + (h - dh);
+    }
+
+    if (img) ctx.drawImage(img, dx, dy, dw, dh);
+    else if (options.fallbackColor) {
+        ctx.fillStyle = options.fallbackColor;
+        ctx.fillRect(x, y, w, h);
+    }
+}
+
+function resolveHamsterPose({ isFall, isGrounded, jumpCount, isMoving }) {
+    if (isFall) return 'fall';
+    if (isGrounded === false) return (jumpCount >= 2) ? 'djump' : 'jump';
+    return isMoving ? 'run' : 'idle';
+}
 
 function checkAllImagesLoaded() {
     imagesLoadedCount++;
@@ -36,7 +105,7 @@ function startGame() {
     if (gameStarted) return;
     gameStarted = true;
     document.getElementById('loading').style.display = 'none';
-    if (localStorage.getItem('ham_seeds')) initNest(); else initNest();
+    initNest();
 }
 
 function createSeedThumbnail() {
@@ -52,25 +121,12 @@ function createSeedThumbnail() {
     seedThumb = offCanvas;
 }
 
-for (let key in sprites) {
-    sprites[key].img.onload = function() {
-        sprites[key].loaded = true;
-        if (key === 'seed') createSeedThumbnail();
-        checkAllImagesLoaded();
-    };
-    sprites[key].img.onerror = function() {
-        console.warn("Image load failed: " + sprites[key].img.src);
-        sprites[key].loaded = false; 
-        checkAllImagesLoaded(); 
-    };
-}
-
 setTimeout(() => {
     if (!gameStarted) {
         console.warn("Loading timeout. Force start.");
         startGame();
     }
-}, 3000);
+}, 5000);
 
 function resize() {
     const container = document.getElementById('canvasContainer');

@@ -26,9 +26,10 @@ const FOLLOWER_SPACING_SCALE = 0.75;
 const SLOPE_STICK_SNAP = 16;
 
 function getMaxSeedCapacity() { return (1 + followers.length) * SEED_CAPACITY_PER_HAMSTER; }
-function createFollower() {
+function createFollower(speciesName) {
     return {
         id: ++followerSerial,
+        speciesName: resolveHamsterSpeciesName(speciesName || pickHamsterSpecies(followers.length)),
         attachedWallId: null,
         wallState: 'none',
         wallRamCooldown: 0,
@@ -74,6 +75,7 @@ function ensureFollowerState(follower) {
     if (follower.approachVy === undefined) follower.approachVy = 0;
     if (follower.lastRenderX === undefined) follower.lastRenderX = 0;
     if (follower.lastRenderY === undefined) follower.lastRenderY = 0;
+    if (follower.speciesName === undefined) follower.speciesName = pickHamsterSpecies(followers.indexOf(follower));
     return follower;
 }
 
@@ -87,16 +89,13 @@ const player = {
     prevX: 0,
     prevY: 0,
     draw: function() {
-        let img = sprites.run.loaded ? sprites.run.img : null;
-        let bobY = 0;
-        if (!this.isGrounded) {
-            if (this.jumpCount === 2) img = sprites.djump.loaded ? sprites.djump.img : img;
-            else img = sprites.jump.loaded ? sprites.jump.img : img;
-        } else {
-            bobY = Math.sin(Date.now() / 13) * 1;
-        }
-        if(img) ctx.drawImage(img, this.x, this.y + bobY, this.width, this.height);
-        else { ctx.fillStyle = this.color; ctx.fillRect(this.x, this.y + bobY, this.width, this.height); }
+        let pose = resolveHamsterPose({
+            isGrounded: this.isGrounded,
+            jumpCount: this.jumpCount,
+            isMoving: true
+        });
+        let bobY = this.isGrounded ? Math.sin(Date.now() / 13) * 1 : 0;
+        drawHamsterSprite(mainHamsterName, pose, this.x, this.y + bobY, this.width, this.height, { fallbackColor: this.color });
     },
     update: function() {
         this.prevX = this.x;
@@ -120,7 +119,8 @@ const player = {
         } else if (followers.length > 0) {
             this.vx = speed;
             this.dy = this.jumpPower; this.isGrounded = false;
-            followers.shift(); detachedFriends.push(new DetachedFriend(this.x, this.y + this.height));
+            let sacrificed = followers.shift();
+            detachedFriends.push(new DetachedFriend(this.x, this.y + this.height, sacrificed.speciesName));
             let currentMax = getMaxSeedCapacity(); if (seedsCollected > currentMax) seedsCollected = currentMax; updateSeedDisplay();
             sacrificeCount++;
             if (sacrificeCount >= 2) {
@@ -150,14 +150,17 @@ function updateCamera() {
 }
 
 class DetachedFriend {
-    constructor(x, y) { this.x = x; this.y = y; this.width = 68; this.height = 68; this.dy = 5; this.isDead = false; }
+    constructor(x, y, speciesName) {
+        this.x = x; this.y = y; this.width = 68; this.height = 68; this.dy = 5; this.isDead = false;
+        this.speciesName = resolveHamsterSpeciesName(speciesName);
+    }
     update() { this.dy += gravity; this.y += this.dy; this.x -= 1.2; }
     draw() {
-        if (sprites.fall.loaded) {
-            ctx.save(); ctx.translate(this.x + this.width/2, this.y + this.height/2); 
-            ctx.rotate(Math.random()); 
-            ctx.drawImage(sprites.fall.img, -this.width/2, -this.height/2, this.width, this.height); ctx.restore();
-        } else { ctx.fillStyle = '#ff6b6b'; ctx.fillRect(this.x, this.y, this.width, this.height); }
+        ctx.save();
+        ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+        ctx.rotate(Math.random());
+        drawHamsterSprite(this.speciesName, 'fall', 0, 0, this.width, this.height, { anchor: 'center', fallbackColor: '#ff6b6b' });
+        ctx.restore();
     }
 }
 let detachedFriends = [];
@@ -216,20 +219,20 @@ class Seed {
 let seeds = [];
 
 class Collectible {
-    constructor(x, y, falling = false) {
+    constructor(x, y, falling = false, speciesName = null) {
         this.x = x;
         this.y = y;
         this.width = 68;
         this.height = 68;
         this.magnet = false;
+        this.speciesName = resolveHamsterSpeciesName(speciesName || pickHamsterSpecies(followers.length + 1));
         this.isFalling = !!falling;
         this.fallVx = falling ? ((Math.random() - 0.5) * 1.8) : 0;
         this.fallVy = falling ? (1.2 + Math.random() * 2.0) : 0;
     }
     draw() {
         ctx.globalAlpha = 1.0;
-        if (sprites.idle.loaded) ctx.drawImage(sprites.idle.img, this.x, this.y, this.width, this.height);
-        else { ctx.fillStyle = '#feca57'; ctx.fillRect(this.x, this.y, this.width, this.height); }
+        drawHamsterSprite(this.speciesName, 'idle', this.x, this.y, this.width, this.height, { fallbackColor: '#feca57' });
     }
     update() {
         if (this.isFalling) {
@@ -281,7 +284,7 @@ function spawnWallBreakRewards(wall) {
     for (let i = 0; i < friendDropCount; i++) {
         let ix = dropCenterX + (Math.random() - 0.5) * (dropSpread * 0.75);
         let iy = -40 - Math.random() * 260;
-        collectibles.push(new Collectible(ix, iy, true));
+        collectibles.push(new Collectible(ix, iy, true, pickHamsterSpecies(i)));
     }
 }
 
@@ -701,12 +704,10 @@ function drawWallAttackers(wall) {
         let biteOffset = Math.sin(phase) * 2.2;
         let drawX = baseX + biteOffset;
         let drawY = baseY + Math.sin(phase * 0.7) * 1.2;
-        let img = sprites.run.loaded ? sprites.run.img : null;
-        if (img) ctx.drawImage(img, drawX, drawY, size, size);
-        else {
-            ctx.fillStyle = attacker.type === 'player' ? '#ff3f34' : '#ff9f43';
-            ctx.fillRect(drawX, drawY, size, size);
-        }
+        let speciesName = attacker.type === 'player' ? mainHamsterName : (attacker.followerRef?.speciesName || MAIN_HAMSTER_DEFAULT);
+        drawHamsterSprite(speciesName, 'run', drawX, drawY, size, size, {
+            fallbackColor: attacker.type === 'player' ? '#ff3f34' : '#ff9f43'
+        });
         if (Math.random() < 0.35) {
             let fx = wall.x + 2 + (Math.random() * 3 - 1.5);
             let fy = drawY + size * (0.25 + Math.random() * 0.5);
@@ -902,7 +903,7 @@ function addPlatform(x, pattern) {
         let centerX = width / 2; let centerY = newPlatform.y + (centerX * newPlatform.slopeFactor);
         let itemY = centerY - 45; 
         let itemX = x + centerX;
-        collectibles.push(new Collectible(itemX, itemY)); spawnFriendFlag = false;
+        collectibles.push(new Collectible(itemX, itemY, false, pickHamsterSpecies(followers.length + 1))); spawnFriendFlag = false;
     }
 }
 
@@ -1004,7 +1005,7 @@ function gameLoop() {
         let df = detachedFriends[i]; df.update();
         let groundY = getGroundYAt(df.x + df.width / 2);
         if (!df.isDead && groundY !== null && df.y + df.height >= groundY && df.dy >= 0) {
-            let f = createFollower();
+            let f = createFollower(df.speciesName);
             f.x = df.x;
             f.y = groundY - 68;
             f.isGrounded = true;
@@ -1025,7 +1026,7 @@ function gameLoop() {
     for (let i = 0; i < collectibles.length; i++) {
         let item = collectibles[i]; item.update();
         if (player.x < item.x + item.width && player.x + player.width > item.x && player.y < item.y + item.height && player.y + player.height > item.y) {
-            let f = createFollower();
+            let f = createFollower(item.speciesName);
             f.x = player.x - 72 * (followers.length + 1);
             f.y = player.y;
             followers.push(f);
@@ -1062,21 +1063,18 @@ function gameLoop() {
         let st = followerStates[i];
         if (st.follower.attachedWallId !== null) continue;
         if (st.follower.wallState === 'approaching') {
-            let imgA = sprites.run.loaded ? sprites.run.img : null;
-            if (st.follower.approachPhase === 'jump') imgA = sprites.jump.loaded ? sprites.jump.img : imgA;
+            let pose = st.follower.approachPhase === 'jump' ? 'jump' : 'run';
             let bobA = st.follower.approachPhase === 'jump' ? 0 : Math.sin(Date.now() / 18 + i * 0.7) * 1.1;
-            if (imgA) ctx.drawImage(imgA, st.follower.approachX, st.follower.approachY + bobA, st.size, st.size);
-            else { ctx.fillStyle = '#ff9f43'; ctx.fillRect(st.follower.approachX, st.follower.approachY + bobA, st.size, st.size); }
+            drawHamsterSprite(st.follower.speciesName, pose, st.follower.approachX, st.follower.approachY + bobA, st.size, st.size, { fallbackColor: '#ff9f43' });
             continue;
         }
         let bobY = st.pastState && st.pastState.isGrounded ? Math.sin(Date.now() / 13 + (i + 1) * 1.2) * 1 : 0;
-        let img = sprites.run.loaded ? sprites.run.img : null;
-        if (st.pastState && !st.pastState.isGrounded) {
-            if (st.pastState.jumpCount >= 2) img = sprites.djump.loaded ? sprites.djump.img : img;
-            else img = sprites.jump.loaded ? sprites.jump.img : img;
-        }
-        if (img) ctx.drawImage(img, st.followX, st.drawY + bobY, st.size, st.size);
-        else { ctx.fillStyle = '#ff9f43'; ctx.fillRect(st.followX, st.drawY + bobY, st.size, st.size); }
+        let pose = resolveHamsterPose({
+            isGrounded: !(st.pastState && !st.pastState.isGrounded),
+            jumpCount: st.pastState ? st.pastState.jumpCount : 0,
+            isMoving: true
+        });
+        drawHamsterSprite(st.follower.speciesName, pose, st.followX, st.drawY + bobY, st.size, st.size, { fallbackColor: '#ff9f43' });
     }
     player.draw();
     ctx.restore();
@@ -1181,8 +1179,8 @@ function resetGame(initialFollowersCount = 0) {
     worldFloorY = canvas.height / 2 + 100;
     cameraX = 0;
     player.x = 150; player.y = worldFloorY - 68; player.width = 68; player.height = 68; player.dy = 0; player.vy = 0; player.vx = 0; player.jumpCount = 0; player.color = '#ff3f34'; player.isWallAttached = false; player.isGrounded = true;
-    for(let i=0; i<initialFollowersCount; i++){ 
-        let f = createFollower();
+    for(let i=0; i<initialFollowersCount; i++){
+        let f = createFollower(pickHamsterSpecies(i));
         f.x = player.x - 72 * (i + 1);
         f.y = player.y;
         f.isGrounded = true;

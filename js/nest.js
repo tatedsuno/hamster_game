@@ -5,6 +5,89 @@ let nestHamsters = []; let nestSeeds = [];
 let nestEffects = [];
 let nestInitialFrame = true;
 let nestMainHamBottomY = 9999;
+let nestMainHamCenterX = 0;
+let nestMainHamCenterY = 0;
+let nestMainHamHitRadius = 0;
+let nestMainHamLabelBottom = 0;
+
+const NEST_BOTTOM_MARGIN = 14;
+const NEST_LABEL_GAP = 8;
+const NEST_LABEL_HEIGHT = 16;
+const NEST_MAIN_SIZE_MIN = 88;
+const NEST_MAIN_SIZE_MAX = 200;
+const NEST_MAIN_LAYOUT_REF_SCALE = 1;
+const NEST_MAIN_DISPLAY_SCALE = 1.3;
+
+function getNestMainLayoutMaxSpeciesScale() {
+    let max = NEST_MAIN_LAYOUT_REF_SCALE;
+    for (let s of Object.values(HAMSTER_DRAW_SCALES)) {
+        if (s > max) max = s;
+    }
+    return max;
+}
+
+function getNestMainLayoutMaxVisualScale() {
+    return NEST_MAIN_DISPLAY_SCALE * getNestMainLayoutMaxSpeciesScale();
+}
+
+function computeNestMainHamLayout(floorY) {
+    let playBottom = canvas.height - NEST_BOTTOM_MARGIN;
+    let available = Math.max(100, playBottom - floorY);
+    let mySize = Math.min(NEST_MAIN_SIZE_MAX, canvas.width * 0.42, available * 0.5);
+    mySize = Math.max(NEST_MAIN_SIZE_MIN, mySize);
+
+    let maxVisualScale = getNestMainLayoutMaxVisualScale();
+    let maxHeight = mySize * maxVisualScale;
+    let labelBlock = NEST_LABEL_GAP + NEST_LABEL_HEIGHT;
+    let minBottomY = floorY + maxHeight + 20;
+    let maxBottomY = playBottom - labelBlock;
+    let mainBottomY;
+
+    if (maxBottomY >= minBottomY) {
+        mainBottomY = minBottomY + (maxBottomY - minBottomY) * 0.58;
+    } else {
+        mySize = Math.max(72, Math.min(mySize, ((available - labelBlock - 24) * 0.85) / maxVisualScale));
+        maxHeight = mySize * maxVisualScale;
+        minBottomY = floorY + maxHeight + 12;
+        maxBottomY = playBottom - labelBlock;
+        mainBottomY = Math.max(minBottomY, Math.min(maxBottomY, (minBottomY + maxBottomY) / 2));
+    }
+
+    let drawSize = mySize * NEST_MAIN_DISPLAY_SCALE;
+    let visualHalf = (drawSize / 2) * getHamsterDrawScale(mainHamsterName);
+    let myY = mainBottomY - visualHalf;
+    let speciesLabelY = mainBottomY + NEST_LABEL_GAP + NEST_LABEL_HEIGHT * 0.7;
+    let fontSize = Math.max(11, Math.min(14, canvas.width * 0.034));
+
+    return {
+        mySize,
+        drawSize,
+        myY,
+        mainBottomY,
+        visualHalf,
+        speciesLabelY,
+        fontSize,
+        labelBottom: speciesLabelY + 6
+    };
+}
+
+function applyNestMainHamLayout(layout) {
+    nestMainHamCenterX = canvas.width / 2;
+    nestMainHamCenterY = layout.myY;
+    nestMainHamHitRadius = layout.visualHalf;
+    nestMainHamBottomY = layout.mainBottomY;
+    nestMainHamLabelBottom = layout.labelBottom;
+}
+
+function isPointOnNestMainHamster(cx, cy) {
+    if (nestMainHamHitRadius <= 0) return false;
+    let half = nestMainHamHitRadius;
+    let left = nestMainHamCenterX - half;
+    let right = nestMainHamCenterX + half;
+    let top = nestMainHamCenterY - half;
+    let bottom = nestMainHamLabelBottom || (nestMainHamCenterY + half + 36);
+    return cx >= left && cx <= right && cy >= top && cy <= bottom;
+}
 
 class NestEffect {
     constructor(x, y, type) {
@@ -95,9 +178,10 @@ class PhysicsSeed {
 }
 
 class NestHamster {
-    constructor(stage = 0, breedingStartedAt = 0) { 
+    constructor(stage = 0, breedingStartedAt = 0, speciesName = null) { 
         this.stage = stage;
         this.breedingStartedAt = breedingStartedAt;
+        this.speciesName = resolveHamsterSpeciesName(speciesName || pickHamsterSpecies(nestHamsters.length));
         this.x = Math.random() * canvas.width;
 
         if (this.stage === 3) {
@@ -219,13 +303,17 @@ class NestHamster {
         if (this.isDragging) ctx.scale(1.1, 1.1);
         if (this.flip) ctx.scale(-1, 1);
         
-        let img = sprites.idle.loaded ? sprites.idle.img : null;
-        if (this.state === 'move' && !this.isDragging && !this.isThrown && sprites.run.loaded) img = sprites.run.img;
-        if ((this.isThrown || this.isDragging) && sprites.fall.loaded) img = sprites.fall.img;
-        if ((this.stage === 2 || this.stage === 3) && sprites.idle.loaded) img = sprites.idle.img;
-        
-        if (img) ctx.drawImage(img, -this.size/2, -this.size/2, this.size, this.size);
-        else { ctx.fillStyle = this.stage === 2 ? '#fab1a0' : '#ff9f43'; ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size); }
+        let pose = resolveHamsterPose({
+            isFall: this.isThrown || this.isDragging,
+            isGrounded: true,
+            jumpCount: 0,
+            isMoving: this.state === 'move' && !this.isDragging && !this.isThrown
+        });
+        if ((this.stage === 2 || this.stage === 3) && !this.isDragging && !this.isThrown) pose = 'idle';
+        drawHamsterSprite(this.speciesName, pose, 0, 0, this.size, this.size, {
+            anchor: 'center',
+            fallbackColor: this.stage === 2 ? '#fab1a0' : '#ff9f43'
+        });
 
         if (this.stage === 3 && this.breedingStartedAt > 0) {
             let progress = Math.min(1, (Date.now() - this.breedingStartedAt) / BREEDING_CONFIG.pregnancyTime);
@@ -266,22 +354,20 @@ function initNest() {
     nestInitialFrame = true;
 
     let initFloorY = canvas.height * NEST_FLOOR_RATIO;
-    let initMyY = initFloorY + 100;
-    let initSafeBottom = canvas.height;
-    if (initMyY + 100 > initSafeBottom) initMyY = initSafeBottom - 110;
-    nestMainHamBottomY = initMyY + 100;
+    applyNestMainHamLayout(computeNestMainHamLayout(initFloorY));
 
     let displayAdults = Math.min(bankFriends, 30);
-    for(let i=0; i<displayAdults; i++) nestHamsters.push(new NestHamster(0)); 
+    for(let i=0; i<displayAdults; i++) nestHamsters.push(new NestHamster(0, 0, pickHamsterSpecies(i))); 
     
     breedingQueue.forEach(q => {
+        let species = getBreedingQueueSpecies(q);
         if (q.type === 'pregnant') {
-            for (let i = 0; i < q.count; i++) nestHamsters.push(new NestHamster(3, q.startedAt));
+            for (let i = 0; i < q.count; i++) nestHamsters.push(new NestHamster(3, q.startedAt, species));
         } else if (q.type === 'baby') {
             let progress = (Date.now() - q.startedAt) / BREEDING_CONFIG.babyGrowthTime;
             let stage = progress < 0.5 ? 2 : 1;
             let count = Math.min(q.count, 20);
-            for (let i = 0; i < count; i++) nestHamsters.push(new NestHamster(stage, q.startedAt));
+            for (let i = 0; i < count; i++) nestHamsters.push(new NestHamster(stage, q.startedAt, species));
         }
     });
 
@@ -299,7 +385,13 @@ function initNest() {
 }
 
 function spawnEffect(x, y, type) {
-    if (type === 'pregnant') nestEffects.push(new NestEffect(x, y, type));
+    if (NestEffect.CONFIGS[type] || type === 'default') nestEffects.push(new NestEffect(x, y, type));
+}
+
+function spawnMainHamsterGrowEffect() {
+    let floorY = canvas.height * NEST_FLOOR_RATIO;
+    applyNestMainHamLayout(computeNestMainHamLayout(floorY));
+    spawnEffect(nestMainHamCenterX, nestMainHamCenterY, 'grow');
 }
 
 function applyBreedingChanges(result, suppressEffects) {
@@ -317,9 +409,10 @@ function applyBreedingChanges(result, suppressEffects) {
         }
         let newBabyQ = breedingQueue.find(q => q.type === 'baby');
         if (newBabyQ) {
+            let babySpecies = getBreedingQueueSpecies(newBabyQ);
             let count = Math.min(result.newBabiesTotal, 20);
             for (let i = 0; i < count; i++) {
-                nestHamsters.push(new NestHamster(2, newBabyQ.startedAt));
+                nestHamsters.push(new NestHamster(2, newBabyQ.startedAt, babySpecies));
             }
         }
     }
@@ -392,30 +485,32 @@ function nestLoop() {
     ctx.fillStyle = '#fdcb6e'; ctx.fillRect(0, floorY, canvas.width, canvas.height - floorY);
     ctx.fillStyle = '#e1b12c'; ctx.fillRect(0, floorY, canvas.width, 10);
 
-    let mySize = 200;
-    let myY = floorY + 100;
-    if (myY + mySize / 2 > cachedSafeBottomY) myY = cachedSafeBottomY - mySize / 2 - 10;
-    nestMainHamBottomY = myY + mySize / 2;
+    let layout = computeNestMainHamLayout(floorY);
+    applyNestMainHamLayout(layout);
 
     let excessSeeds = bankSeeds - nestSeeds.length;
     if (excessSeeds > 0) drawStaticSeedPile(canvas.width / 2, floorY, excessSeeds, bankSeeds);
     nestSeeds.forEach(s => s.update()); solvePhysics(); nestSeeds.forEach(s => s.draw());
-    
+
     nestHamsters.sort((a, b) => a.y - b.y);
     nestHamsters.forEach(h => { h.update(); h.draw(); });
 
     nestEffects = nestEffects.filter(e => e.update());
     nestEffects.forEach(e => e.draw());
 
-    ctx.save(); ctx.translate(canvas.width/2 - mySize/2, myY - mySize/2);
-    if (sprites.idle.loaded) ctx.drawImage(sprites.idle.img, 0, 0, mySize, mySize);
-    else { ctx.fillStyle = '#ff3f34'; ctx.fillRect(0, 0, mySize, mySize); }
-    ctx.restore();
+    drawHamsterSprite(mainHamsterName, 'idle', canvas.width / 2, layout.mainBottomY, layout.drawSize, layout.drawSize, { anchor: 'bottom-center', fallbackColor: '#ff3f34' });
 
     ctx.fillStyle = '#7a5a0b';
-    ctx.font = 'bold 20px sans-serif';
+    let labelFontSize = layout.fontSize;
+    let maxLabelWidth = canvas.width - 24;
+    ctx.font = `bold ${labelFontSize}px sans-serif`;
+    while (labelFontSize > 10 && ctx.measureText(mainHamsterName).width > maxLabelWidth) {
+        labelFontSize -= 1;
+        ctx.font = `bold ${labelFontSize}px sans-serif`;
+    }
     ctx.textAlign = 'center';
-    ctx.fillText(`${bankFriends} Hamsters`, canvas.width / 2, myY + mySize / 2 + 24);
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(mainHamsterName, canvas.width / 2, layout.speciesLabelY);
 
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.font = '16px sans-serif';
