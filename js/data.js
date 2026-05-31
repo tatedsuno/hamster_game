@@ -401,12 +401,26 @@ function getWallRewardHamsterSpecies(distanceMeters) {
     return sequence[tier];
 }
 
+function getMainHamsterSpeciesCycleChoices() {
+    if (gameState === 'nest' && typeof getNestPresentHamsterSpecies === 'function') {
+        return getNestPresentHamsterSpecies();
+    }
+    return getUnlockedHamsters();
+}
+
 function cycleMainHamsterSpecies() {
-    let unlocked = getUnlockedHamsters();
-    if (unlocked.length <= 1) return mainHamsterName;
-    let idx = unlocked.indexOf(mainHamsterName);
+    let choices = getMainHamsterSpeciesCycleChoices();
+    if (!choices.length) {
+        choices = [mainHamsterName || MAIN_HAMSTER_DEFAULT];
+    }
+    if (choices.length <= 1) return mainHamsterName;
+    let current = resolveHamsterSpeciesName(mainHamsterName);
+    let idx = choices.indexOf(current);
     if (idx < 0) idx = 0;
-    mainHamsterName = unlocked[(idx + 1) % unlocked.length];
+    mainHamsterName = choices[(idx + 1) % choices.length];
+    if (!choices.includes(selectedBreedingSpecies)) {
+        selectedBreedingSpecies = mainHamsterName;
+    }
     saveData();
     updateNestUI();
     return mainHamsterName;

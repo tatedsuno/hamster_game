@@ -629,6 +629,26 @@ function solvePhysics() {
     }
 }
 
+function getNestPresentHamsterSpecies() {
+    let set = new Set();
+    if (mainHamsterName) {
+        set.add(resolveHamsterSpeciesName(mainHamsterName));
+    }
+    for (let h of nestHamsters) {
+        if (h && h.speciesName) {
+            set.add(resolveHamsterSpeciesName(h.speciesName));
+        }
+    }
+    let ordered = [];
+    for (let name of HAMSTER_COLLECTION) {
+        if (set.has(name)) ordered.push(name);
+    }
+    if (!ordered.length) {
+        return [mainHamsterName || MAIN_HAMSTER_DEFAULT];
+    }
+    return ordered;
+}
+
 function updateSlider() {
     const slider = document.getElementById('friendSlider');
     selectedFriendsCount = parseInt(slider.value);
