@@ -93,6 +93,8 @@ body.play-mode {
     box-sizing: border-box;
     overflow: hidden;
     flex-shrink: 0;
+    pointer-events: auto;
+    touch-action: manipulation;
 }
 
 #nestHeader {
@@ -223,6 +225,40 @@ body.play-mode {
     background-color: rgba(0,0,0,0.3);
     padding: 4px 8px;
     border-radius: 4px;
+}
+
+.adventure-toast {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-8px);
+    max-width: calc(100% - 24px);
+    padding: 10px 16px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.78);
+    color: #ffeaa7;
+    font-size: 17px;
+    font-weight: bold;
+    text-align: center;
+    line-height: 1.35;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.adventure-toast.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+
+.adventure-toast.encyclopedia-complete {
+    color: #fff;
+    background: linear-gradient(135deg, rgba(253, 121, 168, 0.95), rgba(0, 206, 201, 0.95));
+    font-size: 18px;
 }
 
 .btn {
@@ -368,11 +404,20 @@ input[type=range] { width: 100%; margin: 0; }
     border-color: #555;
 }
 
-#openEncyclopediaBtn {
+.encyclopedia-chip {
+    cursor: pointer;
+    -webkit-tap-highlight-color: rgba(9, 132, 227, 0.2);
+}
+
+#openEncyclopediaBtn,
+#breedingInfoBtn {
     color: #0984e3;
     cursor: pointer;
     text-decoration: underline;
     text-underline-offset: 2px;
+    pointer-events: auto;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(9, 132, 227, 0.2);
 }
 
 @media (max-width: 520px) {

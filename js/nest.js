@@ -79,7 +79,16 @@ function applyNestMainHamLayout(layout) {
     nestMainHamLabelBottom = layout.labelBottom;
 }
 
+function clearNestMainHamPresence(floorY) {
+    nestMainHamCenterX = canvas.width / 2;
+    nestMainHamCenterY = 0;
+    nestMainHamHitRadius = 0;
+    nestMainHamBottomY = floorY !== undefined ? floorY : canvas.height;
+    nestMainHamLabelBottom = 0;
+}
+
 function isPointOnNestMainHamster(cx, cy) {
+    if (isAwaitingResetSpeciesSelection()) return false;
     if (nestMainHamHitRadius <= 0) return false;
     let half = nestMainHamHitRadius;
     let left = nestMainHamCenterX - half;
@@ -342,6 +351,10 @@ function initNest() {
     document.getElementById('gameOverModal').style.display = 'none';
     document.getElementById('pauseModal').style.display = 'none';
     document.getElementById('breedingModal').style.display = 'none';
+    let resetSpeciesModal = document.getElementById('resetSpeciesModal');
+    if (resetSpeciesModal && !isAwaitingResetSpeciesSelection()) {
+        resetSpeciesModal.style.display = 'none';
+    }
     document.getElementById('instruction').style.display = 'none';
     cancelPendingDrag();
     simulateBackgroundWork();
@@ -354,7 +367,11 @@ function initNest() {
     nestInitialFrame = true;
 
     let initFloorY = canvas.height * NEST_FLOOR_RATIO;
-    applyNestMainHamLayout(computeNestMainHamLayout(initFloorY));
+    if (isAwaitingResetSpeciesSelection()) {
+        clearNestMainHamPresence(initFloorY);
+    } else {
+        applyNestMainHamLayout(computeNestMainHamLayout(initFloorY));
+    }
 
     let displayAdults = Math.min(bankFriends, 30);
     for(let i=0; i<displayAdults; i++) nestHamsters.push(new NestHamster(0, 0, pickHamsterSpecies(i))); 
@@ -382,6 +399,9 @@ function initNest() {
         nestSeeds.push(s);
     }
     nestLoop();
+    if (typeof showPostResetSpeciesPickerIfNeeded === 'function') {
+        showPostResetSpeciesPickerIfNeeded();
+    }
 }
 
 function spawnEffect(x, y, type) {
@@ -445,7 +465,9 @@ function updateNestUI() {
     breedingQueue.forEach(q => { if (q.type === 'pregnant') pregnantCount += q.count; if (q.type === 'baby') babyCount += q.count; });
     document.getElementById('bankFriends').innerText = bankFriends;
     let mainHamText = document.getElementById('mainHamsterName');
-    if (mainHamText) mainHamText.innerText = mainHamsterName;
+    if (mainHamText) {
+        mainHamText.innerText = isAwaitingResetSpeciesSelection() ? '' : (mainHamsterName || '');
+    }
     document.getElementById('babyCount').innerText = babyCount;
     document.getElementById('pregnantCount').innerText = pregnantCount;
     renderHamsterEncyclopedia();
@@ -485,8 +507,14 @@ function nestLoop() {
     ctx.fillStyle = '#fdcb6e'; ctx.fillRect(0, floorY, canvas.width, canvas.height - floorY);
     ctx.fillStyle = '#e1b12c'; ctx.fillRect(0, floorY, canvas.width, 10);
 
-    let layout = computeNestMainHamLayout(floorY);
-    applyNestMainHamLayout(layout);
+    let awaitingResetSpecies = isAwaitingResetSpeciesSelection();
+    let layout = null;
+    if (awaitingResetSpecies) {
+        clearNestMainHamPresence(floorY);
+    } else {
+        layout = computeNestMainHamLayout(floorY);
+        applyNestMainHamLayout(layout);
+    }
 
     let excessSeeds = bankSeeds - nestSeeds.length;
     if (excessSeeds > 0) drawStaticSeedPile(canvas.width / 2, floorY, excessSeeds, bankSeeds);
@@ -498,19 +526,21 @@ function nestLoop() {
     nestEffects = nestEffects.filter(e => e.update());
     nestEffects.forEach(e => e.draw());
 
-    drawHamsterSprite(mainHamsterName, 'idle', canvas.width / 2, layout.mainBottomY, layout.drawSize, layout.drawSize, { anchor: 'bottom-center', fallbackColor: '#ff3f34' });
+    if (!awaitingResetSpecies && layout && mainHamsterName) {
+        drawHamsterSprite(mainHamsterName, 'idle', canvas.width / 2, layout.mainBottomY, layout.drawSize, layout.drawSize, { anchor: 'bottom-center', fallbackColor: '#ff3f34' });
 
-    ctx.fillStyle = '#7a5a0b';
-    let labelFontSize = layout.fontSize;
-    let maxLabelWidth = canvas.width - 24;
-    ctx.font = `bold ${labelFontSize}px sans-serif`;
-    while (labelFontSize > 10 && ctx.measureText(mainHamsterName).width > maxLabelWidth) {
-        labelFontSize -= 1;
+        ctx.fillStyle = '#7a5a0b';
+        let labelFontSize = layout.fontSize;
+        let maxLabelWidth = canvas.width - 24;
         ctx.font = `bold ${labelFontSize}px sans-serif`;
+        while (labelFontSize > 10 && ctx.measureText(mainHamsterName).width > maxLabelWidth) {
+            labelFontSize -= 1;
+            ctx.font = `bold ${labelFontSize}px sans-serif`;
+        }
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(mainHamsterName, canvas.width / 2, layout.speciesLabelY);
     }
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillText(mainHamsterName, canvas.width / 2, layout.speciesLabelY);
 
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.font = '16px sans-serif';
@@ -606,6 +636,7 @@ function updateSlider() {
 }
 
 function departFromNest() {
+    if (isAwaitingResetSpeciesSelection()) return;
     saveData();
     document.getElementById('nestHeader').style.display = 'none';
     document.getElementById('farmHeader').style.display = 'none';

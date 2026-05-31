@@ -19,26 +19,34 @@ let gameState = 'loading';
 let bankSeeds = parseInt(localStorage.getItem('ham_seeds') || '0');
 let bankFriends = parseInt(localStorage.getItem('ham_friends') || '0');
 const HAMSTER_COLLECTION = [
-    'ジャガリアンハムスター',
-    'ゴールデンハムスター',
-    'ブルーサファイアジャンガリアンハムスター',
-    'パールホワイトジャンガリアンハムスター',
-    'ロボロフスキーハムスター',
-    'プディングジャンガリアンハムスター',
+    'ジャガリアン',
+    'ゴールデン',
+    'ブルーサファイアジャンガリアン',
+    'パールホワイトジャンガリアン',
+    'ロボロフスキー',
+    'プディングジャンガリアン',
     'キンクマ'
 ];
-const MAIN_HAMSTER_DEFAULT = 'ジャガリアンハムスター';
+const MAIN_HAMSTER_DEFAULT = 'ジャガリアン';
+const LEGACY_SPECIES_NAME_MAP = {
+    'ジャガリアンハムスター': 'ジャガリアン',
+    'ゴールデンハムスター': 'ゴールデン',
+    'ブルーサファイアジャンガリアンハムスター': 'ブルーサファイアジャンガリアン',
+    'パールホワイトジャンガリアンハムスター': 'パールホワイトジャンガリアン',
+    'ロボロフスキーハムスター': 'ロボロフスキー',
+    'プディングジャンガリアンハムスター': 'プディングジャンガリアン'
+};
 const HAMSTER_SPRITE_KEYS = {
-    'ブルーサファイアジャンガリアンハムスター': '',
-    'ゴールデンハムスター': 'golden',
+    'ブルーサファイアジャンガリアン': '',
+    'ゴールデン': 'golden',
     'キンクマ': 'kinkuma',
-    'ジャガリアンハムスター': 'jungarian',
-    'パールホワイトジャンガリアンハムスター': 'pearl_white',
-    'プディングジャンガリアンハムスター': 'pudding',
-    'ロボロフスキーハムスター': 'roborovski'
+    'ジャガリアン': 'jungarian',
+    'パールホワイトジャンガリアン': 'pearl_white',
+    'プディングジャンガリアン': 'pudding',
+    'ロボロフスキー': 'roborovski'
 };
 const HAMSTER_DRAW_SCALES = {
-    'ゴールデンハムスター': 1.2,
+    'ゴールデン': 1.2,
     'キンクマ': 1.2
 };
 const HAMSTER_UNLOCK_DISTANCE_STEP = 500;
@@ -51,9 +59,21 @@ const GAME_SAVE_KEYS = [
     'ham_farm_rows',
     'ham_last_worker_action',
     'ham_main_species',
-    'ham_best_distance'
+    'ham_best_distance',
+    'ham_encyclopedia_complete'
 ];
-let mainHamsterName = localStorage.getItem('ham_main_species') || MAIN_HAMSTER_DEFAULT;
+const RESET_SPECIES_PICKER_FLAG = 'ham_show_reset_species_picker';
+const RESET_SPECIES_SESSION_KEY = 'ham_reset_unlocked_species';
+const RESET_SPECIES_INITIAL_KEY = 'ham_reset_initial_species';
+function migrateSpeciesName(speciesName) {
+    if (!speciesName) return speciesName;
+    if (HAMSTER_COLLECTION.includes(speciesName)) return speciesName;
+    return LEGACY_SPECIES_NAME_MAP[speciesName] || speciesName;
+}
+
+let mainHamsterName = sessionStorage.getItem(RESET_SPECIES_PICKER_FLAG) === '1'
+    ? null
+    : migrateSpeciesName(localStorage.getItem('ham_main_species') || MAIN_HAMSTER_DEFAULT);
 let bestDistanceMeters = parseInt(localStorage.getItem('ham_best_distance') || '0');
 let breedingQueue = JSON.parse(localStorage.getItem('ham_breeding') || '[]');
 breedingQueue.forEach(q => {
@@ -61,7 +81,10 @@ breedingQueue.forEach(q => {
         q.startedAt = Date.now();
         delete q.tripsRemaining;
     }
-    if (!q.speciesName) q.speciesName = MAIN_HAMSTER_DEFAULT;
+    q.speciesName = migrateSpeciesName(q.speciesName);
+    if (!q.speciesName || !HAMSTER_COLLECTION.includes(q.speciesName)) {
+        q.speciesName = MAIN_HAMSTER_DEFAULT;
+    }
 });
 let selectedFriendsCount = 0;
 
@@ -127,13 +150,17 @@ function hasScenePreviewBuffer(scene) {
     return !!scenePreviewReady[scene];
 }
 
-if (!HAMSTER_COLLECTION.includes(mainHamsterName)) {
+function isAwaitingResetSpeciesSelection() {
+    return sessionStorage.getItem(RESET_SPECIES_PICKER_FLAG) === '1';
+}
+
+if (mainHamsterName && !HAMSTER_COLLECTION.includes(mainHamsterName)) {
     mainHamsterName = MAIN_HAMSTER_DEFAULT;
 }
 if (!Number.isFinite(bestDistanceMeters) || bestDistanceMeters < 0) {
     bestDistanceMeters = 0;
 }
-let selectedBreedingSpecies = mainHamsterName;
+let selectedBreedingSpecies = mainHamsterName || MAIN_HAMSTER_DEFAULT;
 let pendingResetUnlockedSpecies = [];
 let pendingResetInitialSpecies = MAIN_HAMSTER_DEFAULT;
 
@@ -150,9 +177,37 @@ function saveData() {
     localStorage.setItem('ham_farm_workers', farmWorkers);
     localStorage.setItem('ham_farm_rows', farmRows);
     localStorage.setItem('ham_last_worker_action', lastWorkerAction);
-    localStorage.setItem('ham_main_species', mainHamsterName);
+    if (mainHamsterName) {
+        localStorage.setItem('ham_main_species', mainHamsterName);
+    }
     localStorage.setItem('ham_best_distance', bestDistanceMeters);
 }
+
+function migrateLegacySpeciesSaveIfNeeded() {
+    let needSave = false;
+    let storedMain = localStorage.getItem('ham_main_species');
+    if (storedMain) {
+        let migratedMain = migrateSpeciesName(storedMain);
+        if (migratedMain !== storedMain && HAMSTER_COLLECTION.includes(migratedMain)) {
+            needSave = true;
+        }
+    }
+    let rawBreeding = localStorage.getItem('ham_breeding');
+    if (rawBreeding) {
+        try {
+            let parsed = JSON.parse(rawBreeding);
+            for (let q of parsed) {
+                if (migrateSpeciesName(q.speciesName) !== q.speciesName) {
+                    needSave = true;
+                    break;
+                }
+            }
+        } catch (_) {}
+    }
+    if (needSave) saveData();
+}
+
+migrateLegacySpeciesSaveIfNeeded();
 
 function showNestSettings() {
     let modal = document.getElementById('nestSettingsModal');
@@ -175,8 +230,40 @@ function cancelGameReset() {
     if (modal) modal.style.display = 'none';
 }
 
+/** 初期種を先頭に、500mごとの新種が初期種と被らない解放順 */
+function getDistanceUnlockSequence(mainSpecies) {
+    let main = resolveHamsterSpeciesName(mainSpecies || mainHamsterName);
+    let sequence = [main];
+    for (let name of HAMSTER_COLLECTION) {
+        if (name !== main) sequence.push(name);
+    }
+    return sequence;
+}
+
+function getEncyclopediaUnlockedSpeciesAtDistance(distanceMeters) {
+    let count = getUnlockedHamsterCount(distanceMeters);
+    let sequence = getDistanceUnlockSequence(mainHamsterName);
+    return sequence.slice(0, count);
+}
+
 function getUnlockedHamstersAtDistance(distanceMeters) {
-    return HAMSTER_COLLECTION.slice(0, getUnlockedHamsterCount(distanceMeters));
+    return getEncyclopediaUnlockedSpeciesAtDistance(distanceMeters);
+}
+
+/** 図鑑・繁殖・リセット時の選択肢に使う解放済み種一覧 */
+function getEncyclopediaUnlockedSpecies() {
+    if (isAwaitingResetSpeciesSelection()) {
+        return [];
+    }
+    return getEncyclopediaUnlockedSpeciesAtDistance(getEffectiveUnlockDistanceMeters());
+}
+
+function getEncyclopediaUnlockedSpeciesBeforeReset() {
+    return getEncyclopediaUnlockedSpeciesAtDistance(bestDistanceMeters);
+}
+
+function getEncyclopediaDisplayOrder() {
+    return getDistanceUnlockSequence(mainHamsterName);
 }
 
 function renderResetSpeciesPicker() {
@@ -197,14 +284,46 @@ function selectResetInitialSpeciesByIndex(index) {
     renderResetSpeciesPicker();
 }
 
+function persistResetSpeciesPickerSession(unlockedSpecies, initialSpecies) {
+    sessionStorage.setItem(RESET_SPECIES_SESSION_KEY, JSON.stringify(unlockedSpecies));
+    sessionStorage.setItem(RESET_SPECIES_INITIAL_KEY, initialSpecies);
+    sessionStorage.setItem(RESET_SPECIES_PICKER_FLAG, '1');
+}
+
+function clearResetSpeciesPickerSession() {
+    sessionStorage.removeItem(RESET_SPECIES_SESSION_KEY);
+    sessionStorage.removeItem(RESET_SPECIES_INITIAL_KEY);
+    sessionStorage.removeItem(RESET_SPECIES_PICKER_FLAG);
+}
+
 function confirmGameReset() {
     cancelGameReset();
-    pendingResetUnlockedSpecies = getUnlockedHamstersAtDistance(bestDistanceMeters);
+    let unlocked = getEncyclopediaUnlockedSpeciesBeforeReset();
+    if (!unlocked.length) {
+        unlocked = [MAIN_HAMSTER_DEFAULT];
+    }
+    let initial = unlocked.includes(mainHamsterName) ? mainHamsterName : unlocked[0];
+    persistResetSpeciesPickerSession(unlocked, initial);
+    GAME_SAVE_KEYS.forEach(key => localStorage.removeItem(key));
+    location.reload();
+}
+
+function showPostResetSpeciesPickerIfNeeded() {
+    if (sessionStorage.getItem(RESET_SPECIES_PICKER_FLAG) !== '1') return;
+    try {
+        pendingResetUnlockedSpecies = JSON.parse(sessionStorage.getItem(RESET_SPECIES_SESSION_KEY) || '[]');
+    } catch (_) {
+        pendingResetUnlockedSpecies = [];
+    }
+    pendingResetUnlockedSpecies = pendingResetUnlockedSpecies
+        .map(migrateSpeciesName)
+        .filter(name => HAMSTER_COLLECTION.includes(name));
     if (!pendingResetUnlockedSpecies.length) {
         pendingResetUnlockedSpecies = [MAIN_HAMSTER_DEFAULT];
     }
-    pendingResetInitialSpecies = pendingResetUnlockedSpecies.includes(mainHamsterName)
-        ? mainHamsterName
+    let savedInitial = migrateSpeciesName(sessionStorage.getItem(RESET_SPECIES_INITIAL_KEY));
+    pendingResetInitialSpecies = pendingResetUnlockedSpecies.includes(savedInitial)
+        ? savedInitial
         : pendingResetUnlockedSpecies[0];
     renderResetSpeciesPicker();
     let modal = document.getElementById('resetSpeciesModal');
@@ -212,6 +331,10 @@ function confirmGameReset() {
 }
 
 function cancelResetSpeciesPicker() {
+    if (sessionStorage.getItem(RESET_SPECIES_PICKER_FLAG) === '1') {
+        finalizeGameReset();
+        return;
+    }
     let modal = document.getElementById('resetSpeciesModal');
     if (modal) modal.style.display = 'none';
     pendingResetUnlockedSpecies = [];
@@ -219,9 +342,15 @@ function cancelResetSpeciesPicker() {
 
 function finalizeGameReset() {
     let species = resolveHamsterSpeciesName(pendingResetInitialSpecies);
-    GAME_SAVE_KEYS.forEach(key => localStorage.removeItem(key));
-    localStorage.setItem('ham_main_species', species);
-    location.reload();
+    mainHamsterName = species;
+    selectedBreedingSpecies = species;
+    bestDistanceMeters = 0;
+    clearResetSpeciesPickerSession();
+    pendingResetUnlockedSpecies = [];
+    saveData();
+    let modal = document.getElementById('resetSpeciesModal');
+    if (modal) modal.style.display = 'none';
+    if (typeof initNest === 'function') initNest();
 }
 
 function getUnlockedHamsterCount(distanceMeters) {
@@ -237,12 +366,22 @@ function getEffectiveUnlockDistanceMeters() {
 }
 
 function getUnlockedHamsters() {
-    return HAMSTER_COLLECTION.slice(0, getUnlockedHamsterCount(getEffectiveUnlockDistanceMeters()));
+    return getEncyclopediaUnlockedSpecies();
+}
+
+function isNewHamsterSpeciesForEncyclopedia(speciesName) {
+    let name = resolveHamsterSpeciesName(speciesName);
+    return !getEncyclopediaUnlockedSpeciesAtDistance(bestDistanceMeters).includes(name);
 }
 
 function resolveHamsterSpeciesName(speciesName) {
-    if (speciesName && HAMSTER_COLLECTION.includes(speciesName)) return speciesName;
+    let name = migrateSpeciesName(speciesName);
+    if (name && HAMSTER_COLLECTION.includes(name)) return name;
     return MAIN_HAMSTER_DEFAULT;
+}
+
+function getHamsterToastDisplayName(speciesName) {
+    return resolveHamsterSpeciesName(speciesName);
 }
 
 function pickHamsterSpecies(index = 0) {
@@ -254,11 +393,12 @@ function pickHamsterSpecies(index = 0) {
 
 function getWallRewardHamsterSpecies(distanceMeters) {
     let distance = Math.max(0, Math.floor(distanceMeters || 0));
-    let index = Math.min(
+    let tier = Math.min(
         HAMSTER_COLLECTION.length - 1,
         Math.floor(distance / HAMSTER_UNLOCK_DISTANCE_STEP)
     );
-    return HAMSTER_COLLECTION[index];
+    let sequence = getDistanceUnlockSequence(mainHamsterName);
+    return sequence[tier];
 }
 
 function cycleMainHamsterSpecies() {
@@ -292,7 +432,8 @@ function updateHamsterCollectionByDistance(distanceMeters) {
         bestDistanceMeters = distance;
     }
     let unlockedCount = getUnlockedHamsterCount(bestDistanceMeters);
-    let newlyUnlocked = HAMSTER_COLLECTION.slice(previousUnlockedCount, unlockedCount);
+    let sequence = getDistanceUnlockSequence(mainHamsterName);
+    let newlyUnlocked = sequence.slice(previousUnlockedCount, unlockedCount);
     saveData();
     return {
         distance,
@@ -304,7 +445,9 @@ function updateHamsterCollectionByDistance(distanceMeters) {
 }
 
 function renderHamsterEncyclopedia() {
-    let unlockedCount = getUnlockedHamsterCount(bestDistanceMeters);
+    let unlockedSpecies = getEncyclopediaUnlockedSpecies();
+    let unlockedSet = new Set(unlockedSpecies);
+    let unlockedCount = unlockedSpecies.length;
     let content = document.getElementById('hamsterEncyclopediaContent');
     let progress = document.getElementById('encyclopediaProgress');
     let progressInline = document.getElementById('encyclopediaProgressInline');
@@ -314,9 +457,9 @@ function renderHamsterEncyclopedia() {
     if (best) best.innerText = `${bestDistanceMeters}m`;
     if (!content) return;
     let html = '';
-    for (let i = 0; i < HAMSTER_COLLECTION.length; i++) {
-        let unlocked = i < unlockedCount;
-        let name = unlocked ? HAMSTER_COLLECTION[i] : '？？？？？';
+    for (let speciesName of getEncyclopediaDisplayOrder()) {
+        let unlocked = unlockedSet.has(speciesName);
+        let name = unlocked ? speciesName : '？？？？？';
         let icon = unlocked ? '🐹' : '🔒';
         html += `<div class="encyclopedia-row ${unlocked ? 'unlocked' : 'locked'}">${icon} ${name}</div>`;
     }

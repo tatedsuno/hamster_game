@@ -81,11 +81,27 @@ function drawHamsterSprite(speciesName, pose, x, y, w, h, options = {}) {
         dy = y + (h - dh);
     }
 
+    let rotation = options.rotation || 0;
+    if (rotation) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+        ctx.translate(-x, -y);
+    }
+
     if (img) ctx.drawImage(img, dx, dy, dw, dh);
     else if (options.fallbackColor) {
         ctx.fillStyle = options.fallbackColor;
-        ctx.fillRect(x, y, w, h);
+        if (anchor === 'bottom-center') {
+            ctx.fillRect(x - w / 2, y - h, w, h);
+        } else if (anchor === 'center') {
+            ctx.fillRect(x - w / 2, y - h / 2, w, h);
+        } else {
+            ctx.fillRect(x, y, w, h);
+        }
     }
+
+    if (rotation) ctx.restore();
 }
 
 function resolveHamsterPose({ isFall, isGrounded, jumpCount, isMoving }) {

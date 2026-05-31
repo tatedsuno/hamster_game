@@ -21,11 +21,71 @@ let cameraX = 0;
 let cameraLeadPx = 180;
 let worldFloorY = 0;
 let pendingGameOverNestLog = null;
+let adventureToastTimer = null;
+let lastAdventureCollectionCheckDistance = -1;
+let adventureEncyclopediaCompleteShown = localStorage.getItem('ham_encyclopedia_complete') === '1';
+let adventureNewSpeciesAnnounced = new Set();
 const FOLLOWER_DELAY_BASE = 9;
 const FOLLOWER_SPACING_SCALE = 0.75;
 const SLOPE_STICK_SNAP = 16;
 
 function getMaxSeedCapacity() { return (1 + followers.length) * SEED_CAPACITY_PER_HAMSTER; }
+
+function hideAdventureToast() {
+    let el = document.getElementById('adventureToast');
+    if (el) {
+        el.classList.remove('visible', 'encyclopedia-complete');
+        el.textContent = '';
+    }
+    if (adventureToastTimer) {
+        clearTimeout(adventureToastTimer);
+        adventureToastTimer = null;
+    }
+}
+
+function showAdventureToast(message, durationMs, isEncyclopediaComplete) {
+    let el = document.getElementById('adventureToast');
+    if (!el) return;
+    if (adventureToastTimer) {
+        clearTimeout(adventureToastTimer);
+        adventureToastTimer = null;
+    }
+    el.textContent = message;
+    el.classList.toggle('encyclopedia-complete', !!isEncyclopediaComplete);
+    el.classList.add('visible');
+    adventureToastTimer = setTimeout(() => {
+        el.classList.remove('visible', 'encyclopedia-complete');
+        adventureToastTimer = null;
+    }, durationMs || 3000);
+}
+
+function notifyHamsterAcquired(speciesName) {
+    let name = resolveHamsterSpeciesName(speciesName);
+    let prefix = '';
+    if (isNewHamsterSpeciesForEncyclopedia(name) && !adventureNewSpeciesAnnounced.has(name)) {
+        prefix = '新種:';
+        adventureNewSpeciesAnnounced.add(name);
+    }
+    let displayName = getHamsterToastDisplayName(name);
+    showAdventureToast(`${prefix}${displayName}が仲間になった！`, 3000, false);
+}
+
+function checkAdventureCollectionProgress(distanceMeters) {
+    if (gameState !== 'playing') return;
+    if (distanceMeters <= lastAdventureCollectionCheckDistance) return;
+    lastAdventureCollectionCheckDistance = distanceMeters;
+    let result = updateHamsterCollectionByDistance(distanceMeters);
+    if (result.newlyUnlocked.length > 0) {
+        renderHamsterEncyclopedia();
+    }
+    if (!adventureEncyclopediaCompleteShown &&
+        result.unlockedCount >= HAMSTER_COLLECTION.length &&
+        result.newlyUnlocked.length > 0) {
+        adventureEncyclopediaCompleteShown = true;
+        localStorage.setItem('ham_encyclopedia_complete', '1');
+        showAdventureToast('図鑑コンプリート！クリア！', 5000, true);
+    }
+}
 function createFollower(speciesName) {
     return {
         id: ++followerSerial,
@@ -76,6 +136,7 @@ function ensureFollowerState(follower) {
     if (follower.lastRenderX === undefined) follower.lastRenderX = 0;
     if (follower.lastRenderY === undefined) follower.lastRenderY = 0;
     if (follower.speciesName === undefined) follower.speciesName = pickHamsterSpecies(followers.indexOf(follower));
+    if (follower.groundAngle === undefined) follower.groundAngle = 0;
     return follower;
 }
 
@@ -95,7 +156,7 @@ const player = {
             isMoving: true
         });
         let bobY = this.isGrounded ? Math.sin(Date.now() / 13) * 1 : 0;
-        drawHamsterSprite(mainHamsterName, pose, this.x, this.y + bobY, this.width, this.height, { fallbackColor: this.color });
+        drawAdventureHamsterSprite(mainHamsterName, pose, this, this.width, this.height, { bobY: bobY, fallbackColor: this.color });
     },
     update: function() {
         this.prevX = this.x;
@@ -424,6 +485,61 @@ function getGroundYAt(targetX) {
     return null;
 }
 
+function getGroundFootSampleXs(bodyX, bodyWidth) {
+    let footInset = Math.max(6, bodyWidth * 0.22);
+    return {
+        leftFootX: bodyX + footInset,
+        rightFootX: bodyX + bodyWidth - footInset
+    };
+}
+
+function getGroundSlopeAngleAt(bodyX, bodyWidth) {
+    let feet = getGroundFootSampleXs(bodyX, bodyWidth);
+    let leftGroundY = getGroundYAt(feet.leftFootX);
+    let rightGroundY = getGroundYAt(feet.rightFootX);
+    if (leftGroundY === null || rightGroundY === null) return 0;
+    let dx = feet.rightFootX - feet.leftFootX;
+    if (dx <= 0) return 0;
+    return Math.atan2(rightGroundY - leftGroundY, dx);
+}
+
+function getSlopeGroundDrawSink(angle, height) {
+    if (!angle || Math.abs(angle) < 0.02) return 0;
+    return height * 0.08 + Math.abs(Math.sin(angle)) * 6;
+}
+
+function drawAdventureHamsterSprite(speciesName, pose, body, width, height, options = {}) {
+    let bobY = options.bobY || 0;
+    let fallbackColor = options.fallbackColor;
+    if (body.isGrounded) {
+        let angle = body.groundAngle !== undefined ? body.groundAngle : getGroundSlopeAngleAt(body.x, width);
+        let footY = body.y + height + bobY + getSlopeGroundDrawSink(angle, height);
+        drawHamsterSprite(speciesName, pose, body.x + width / 2, footY, width, height, {
+            anchor: 'bottom-center',
+            rotation: angle,
+            fallbackColor: fallbackColor
+        });
+    } else {
+        drawHamsterSprite(speciesName, pose, body.x, body.y + bobY, width, height, { fallbackColor: fallbackColor });
+    }
+}
+
+function drawAdventureHamsterAt(speciesName, pose, x, y, width, height, isGrounded, groundAngle, options = {}) {
+    let bobY = options.bobY || 0;
+    let fallbackColor = options.fallbackColor;
+    if (isGrounded) {
+        let angle = groundAngle !== undefined ? groundAngle : getGroundSlopeAngleAt(x, width);
+        let footY = y + height + bobY + getSlopeGroundDrawSink(angle, height);
+        drawHamsterSprite(speciesName, pose, x + width / 2, footY, width, height, {
+            anchor: 'bottom-center',
+            rotation: angle,
+            fallbackColor: fallbackColor
+        });
+    } else {
+        drawHamsterSprite(speciesName, pose, x, y + bobY, width, height, { fallbackColor: fallbackColor });
+    }
+}
+
 function spawnBreakableWall() {
     let spawnX = prepareWallSpawnX();
     let groundY = 0;
@@ -645,7 +761,17 @@ function getFollowerRenderState(index, follower) {
     let drawY = follower.y;
     follower.lastRenderX = followX;
     follower.lastRenderY = drawY;
-    return { follower, size, followX, drawY, pastState: { isGrounded: follower.isGrounded, jumpCount: follower.jumpCount } };
+    return {
+        follower,
+        size,
+        followX,
+        drawY,
+        pastState: {
+            isGrounded: follower.isGrounded,
+            jumpCount: follower.jumpCount,
+            groundAngle: follower.groundAngle || 0
+        }
+    };
 }
 
 function addWallEffect(x, y, burst = false) {
@@ -811,11 +937,9 @@ function updateFollowerApproachToWall(wall, follower) {
 }
 
 function resolveBodyGroundCollision(body, bodyWidth = 68, bodyHeight = 68) {
-    let footInset = Math.max(6, bodyWidth * 0.22);
-    let leftFootX = body.x + footInset;
-    let rightFootX = body.x + bodyWidth - footInset;
-    let leftGroundY = getGroundYAt(leftFootX);
-    let rightGroundY = getGroundYAt(rightFootX);
+    let feet = getGroundFootSampleXs(body.x, bodyWidth);
+    let leftGroundY = getGroundYAt(feet.leftFootX);
+    let rightGroundY = getGroundYAt(feet.rightFootX);
     let supportYs = [];
     if (leftGroundY !== null) supportYs.push(leftGroundY);
     if (rightGroundY !== null) supportYs.push(rightGroundY);
@@ -836,10 +960,12 @@ function resolveBodyGroundCollision(body, bodyWidth = 68, bodyHeight = 68) {
             body.vy = 0;
             body.isGrounded = true;
             body.jumpCount = 0;
+            body.groundAngle = getGroundSlopeAngleAt(body.x, bodyWidth);
             return;
         }
     }
     body.isGrounded = false;
+    body.groundAngle = 0;
 }
 
 function updateFollowerPhysics(follower, targetX, targetY) {
@@ -880,6 +1006,7 @@ function updateFollowerFromLeaderHistory(follower, index) {
     follower.vy = past.vy || 0;
     follower.isGrounded = !!past.isGrounded;
     follower.jumpCount = past.jumpCount || 0;
+    follower.groundAngle = past.groundAngle || 0;
 }
 
 function addPlatform(x, pattern) {
@@ -940,7 +1067,8 @@ function gameLoop() {
         vy: player.vy,
         footY: player.y + player.height,
         isGrounded: player.isGrounded,
-        jumpCount: player.jumpCount
+        jumpCount: player.jumpCount,
+        groundAngle: player.isGrounded ? (player.groundAngle || 0) : 0
     });
     let maxHistory = (followers.length + 1) * 20;
     if (playerHistory.length > maxHistory + 120) playerHistory.length = maxHistory + 120;
@@ -1032,6 +1160,7 @@ function gameLoop() {
             f.x = player.x - 72 * (followers.length + 1);
             f.y = player.y;
             followers.push(f);
+            notifyHamsterAcquired(item.speciesName);
             collectibles.splice(i, 1); i--; updateSeedDisplay();
         } else if (item.x + item.width < cameraX - 220) { collectibles.splice(i, 1); i--; }
     }
@@ -1067,16 +1196,20 @@ function gameLoop() {
         if (st.follower.wallState === 'approaching') {
             let pose = st.follower.approachPhase === 'jump' ? 'jump' : 'run';
             let bobA = st.follower.approachPhase === 'jump' ? 0 : Math.sin(Date.now() / 18 + i * 0.7) * 1.1;
-            drawHamsterSprite(st.follower.speciesName, pose, st.follower.approachX, st.follower.approachY + bobA, st.size, st.size, { fallbackColor: '#ff9f43' });
+            let approachGrounded = st.follower.approachPhase !== 'jump';
+            let approachAngle = approachGrounded ? getGroundSlopeAngleAt(st.follower.approachX, st.size) : 0;
+            drawAdventureHamsterAt(st.follower.speciesName, pose, st.follower.approachX, st.follower.approachY, st.size, st.size, approachGrounded, approachAngle, { bobY: bobA, fallbackColor: '#ff9f43' });
             continue;
         }
-        let bobY = st.pastState && st.pastState.isGrounded ? Math.sin(Date.now() / 13 + (i + 1) * 1.2) * 1 : 0;
+        let pastGrounded = !!(st.pastState && st.pastState.isGrounded);
+        let bobY = pastGrounded ? Math.sin(Date.now() / 13 + (i + 1) * 1.2) * 1 : 0;
         let pose = resolveHamsterPose({
-            isGrounded: !(st.pastState && !st.pastState.isGrounded),
+            isGrounded: pastGrounded,
             jumpCount: st.pastState ? st.pastState.jumpCount : 0,
             isMoving: true
         });
-        drawHamsterSprite(st.follower.speciesName, pose, st.followX, st.drawY + bobY, st.size, st.size, { fallbackColor: '#ff9f43' });
+        let pastAngle = st.pastState ? st.pastState.groundAngle : 0;
+        drawAdventureHamsterAt(st.follower.speciesName, pose, st.followX, st.drawY, st.size, st.size, pastGrounded, pastAngle, { bobY: bobY, fallbackColor: '#ff9f43' });
     }
     player.draw();
     ctx.restore();
@@ -1092,7 +1225,9 @@ function gameLoop() {
     }
 
     score = Math.max(0, (player.x - 150) * 0.2);
-    document.getElementById('score').innerText = 'Distance: ' + Math.floor(score / 10) + 'm';
+    let distanceMeters = Math.floor(score / 10);
+    document.getElementById('score').innerText = 'Distance: ' + distanceMeters + 'm';
+    checkAdventureCollectionProgress(distanceMeters);
     requestAnimationFrame(gameLoop);
 }
 
@@ -1170,6 +1305,12 @@ function gameOver() {
 
 function resetGame(initialFollowersCount = 0) {
     pendingGameOverNestLog = null;
+    hideAdventureToast();
+    adventureNewSpeciesAnnounced = new Set();
+    lastAdventureCollectionCheckDistance = -1;
+    if (getUnlockedHamsterCount(bestDistanceMeters) >= HAMSTER_COLLECTION.length) {
+        adventureEncyclopediaCompleteShown = true;
+    }
     gameState = 'playing';
     document.body.classList.remove('hub-mode');
     document.body.classList.add('play-mode');

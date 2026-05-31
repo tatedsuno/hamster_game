@@ -23,7 +23,7 @@
         </div>
     </div>
     <div class="scene-header-row scene-header-row-secondary">
-        <div class="scene-info-chip">📘 <span id="encyclopediaProgressInline">1 / 7</span> <span id="openEncyclopediaBtn" onclick="showHamsterEncyclopedia()">開く</span></div>
+        <div class="scene-info-chip encyclopedia-chip" role="button" tabindex="0" onclick="showHamsterEncyclopedia()" aria-label="ハムスター図鑑を開く">📘 <span id="encyclopediaProgressInline">1 / 7</span> <span id="openEncyclopediaBtn">開く</span></div>
     </div>
 </div>
 
@@ -40,6 +40,7 @@
 <div id="loading">Loading...</div>
 
 <div class="ui-layer" id="gameUI">
+    <div id="adventureToast" class="adventure-toast" aria-live="polite"></div>
     <div id="score" class="ui-text">Distance: 0m</div>
     <div id="seedCount" class="ui-text">Seeds: 0 / 100</div>
     <div id="flickHint" class="ui-text">← フリックで帰巣</div>
@@ -116,7 +117,7 @@
 
     <div id="resetSpeciesModal" class="modal modal-confirm">
         <h3>🐹 初期ハムスターを選ぶ</h3>
-        <p class="settings-modal-text">前回までに解放していた種類から、<br>リセット後のメインハムスターを選べます。</p>
+        <p class="settings-modal-text">リセットが完了しました。<br>前回までに解放していた種類から、<br>メインハムスターを選んでください。</p>
         <div id="resetSpeciesPicker" class="reset-species-picker"></div>
         <br>
         <button class="btn" style="background:#00cec9; color:#fff;" onclick="finalizeGameReset()">この種で始める</button>

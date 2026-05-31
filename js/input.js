@@ -73,6 +73,15 @@ function getWrappedHubScene(scene, step) {
     return HUB_SCENE_ORDER[nextIdx];
 }
 
+function isInteractiveHubTarget(target) {
+    if (!target) return false;
+    if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.tagName === 'A') return true;
+    if (target.closest) {
+        return !!target.closest('button, input, a, .modal, .btn, [onclick], #openEncyclopediaBtn, #breedingInfoBtn, #nestSettingsBtn');
+    }
+    return false;
+}
+
 function isAnyHubModalOpen() {
     const modalIds = [
         'breedingModal',
@@ -300,9 +309,10 @@ function getSwipeTarget(diffX, diffY, strictFromScroll) {
 }
 
 function handleInputStart(e) {
-    if (!gameStarted) return; 
-    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') {
+    if (!gameStarted) return;
+    if (isInteractiveHubTarget(e.target)) {
         isGestureTracking = false;
+        isPointerDown = false;
         return;
     }
     if (swipeTransitionLocked) return;
